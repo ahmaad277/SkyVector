@@ -51,27 +51,78 @@ export function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway, now: n
   const angle = getDynamicRunwayAngle(runway.angle, windDir, windStrength);
   const closed = !isOpen || (closedUntil > 0 && now < closedUntil);
 
+  // Determine which end is active (into-wind approach)
+  const activeHeading = getActiveApproachHeading(angle, windDir, windStrength);
+  // If activeHeading equals the base angle, aircraft approach from the -X end (threshold at -length/2)
+  // If activeHeading is the reverse, aircraft approach from the +X end (threshold at +length/2)
+  const activeAtNegativeEnd = Math.abs(shortestAngleDelta(activeHeading, angle)) < 90;
+
+  // Parse label into the two runway numbers, e.g. "09L/27R" → ["09L","27R"]
+  const parts = label.split('/');
+  const negLabel = parts[0] ?? label;   // label for the -X end (base angle direction)
+  const posLabel = parts[1] ?? '';      // label for the +X end (reverse direction)
+
   ctx.save();
   ctx.translate(position.x, position.y);
   ctx.rotate(headingToAngle(angle));
 
   if (type === 'helipad') {
     drawHelipad(ctx, width, closed);
+    // Helipad closed label in world space
+    if (closed) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.font = 'bold 11px "Courier New", monospace';
+      ctx.fillStyle = 'rgba(255,0,60,0.9)';
+      ctx.textAlign = 'center';
+      ctx.fillText('CLOSED', position.x, position.y - width / 2 - 8);
+    }
   } else {
-    drawStrip(ctx, length, width, closed);
-  }
+    drawStrip(ctx, length, width, closed, activeAtNegativeEnd);
 
-  // Label
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.font = 'bold 13px "Courier New", monospace';
-  ctx.fillStyle = closed ? 'rgba(255,0,60,0.9)' : 'rgba(255,255,255,0.95)';
-  ctx.textAlign = 'center';
-  ctx.fillText(closed ? `⛔ ${label} CLOSED` : label, position.x, position.y - width / 2 - 10);
+    // Draw runway designator numbers at each threshold end (while still in rotated ctx)
+    if (!closed) {
+      ctx.font = 'bold 11px "JetBrains Mono", "Courier New", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Active approach end label (cyan, prominent)
+      const activeX = activeAtNegativeEnd ? -length / 2 + 2 : length / 2 - 2;
+      ctx.fillStyle = '#00F0FF';
+      ctx.shadowColor = 'rgba(0,240,255,0.7)';
+      ctx.shadowBlur = 6;
+      ctx.fillText(
+        activeAtNegativeEnd ? negLabel : posLabel,
+        activeX,
+        -width / 2 - 9
+      );
+      ctx.shadowBlur = 0;
+
+      // Inactive end label (dim)
+      if (posLabel) {
+        const inactiveX = activeAtNegativeEnd ? length / 2 - 2 : -length / 2 + 2;
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.fillText(
+          activeAtNegativeEnd ? posLabel : negLabel,
+          inactiveX,
+          -width / 2 - 9
+        );
+      }
+      ctx.textBaseline = 'alphabetic';
+    } else {
+      // Closed indicator
+      ctx.font = 'bold 11px "Courier New", monospace';
+      ctx.fillStyle = 'rgba(255,0,60,0.9)';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('CLOSED', 0, -width / 2 - 9);
+      ctx.textBaseline = 'alphabetic';
+    }
+  }
 
   ctx.restore();
 }
 
-function drawStrip(ctx: CanvasRenderingContext2D, length: number, width: number, closed: boolean): void {
+function drawStrip(ctx: CanvasRenderingContext2D, length: number, width: number, closed: boolean, activeAtNegativeEnd: boolean): void {
   // Runway body
   ctx.fillStyle = closed ? 'rgba(255,0,60,0.25)' : 'rgba(255,255,255,0.15)';
   ctx.fillRect(-length / 2, -width / 2, length, width);
@@ -91,17 +142,30 @@ function drawStrip(ctx: CanvasRenderingContext2D, length: number, width: number,
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Threshold markers
   if (!closed) {
-    ctx.strokeStyle = '#FFFFFF';
+    // Threshold markings at the ACTIVE approach end
+    // Aircraft approach this end → markings here show where to touch down
+    const thresholdX = activeAtNegativeEnd ? -length / 2 + 4 : length / 2 - 14;
+    ctx.strokeStyle = '#00F0FF';
     ctx.lineWidth = 2;
     for (let i = -2; i <= 2; i++) {
-      const bx = -length / 2 + 4;
       ctx.beginPath();
-      ctx.moveTo(bx, i * (width / 5));
-      ctx.lineTo(bx + 10, i * (width / 5));
+      ctx.moveTo(thresholdX, i * (width / 5));
+      ctx.lineTo(thresholdX + 10, i * (width / 5));
       ctx.stroke();
     }
+
+    // Displaced threshold arrow pointing inward from active end
+    ctx.strokeStyle = 'rgba(0,240,255,0.5)';
+    ctx.lineWidth = 1.5;
+    const arrowX = activeAtNegativeEnd ? -length / 2 + 16 : length / 2 - 16;
+    const arrowDir = activeAtNegativeEnd ? 1 : -1;
+    ctx.beginPath();
+    ctx.moveTo(arrowX, 0);
+    ctx.lineTo(arrowX + arrowDir * 8, -4);
+    ctx.moveTo(arrowX, 0);
+    ctx.lineTo(arrowX + arrowDir * 8, 4);
+    ctx.stroke();
   }
 }
 

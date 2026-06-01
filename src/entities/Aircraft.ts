@@ -204,7 +204,6 @@ function updateFollowPath(
   const newTravelled = travelledSoFar + ac.speed * dt;
 
   if (newTravelled >= totalLen) {
-    // Reached end of path, automatically enter holding pattern
     const rad = headingToAngle(ac.heading + 90);
     const HOLDING_RADIUS = 35;
     const center = { x: ac.position.x + Math.cos(rad) * HOLDING_RADIUS, y: ac.position.y + Math.sin(rad) * HOLDING_RADIUS };
@@ -225,36 +224,57 @@ function updateFollowPath(
   }
 
   const newProgress = newTravelled / totalLen;
-  const newPos = pointAlongPath(ac.path, newTravelled);
 
-  // Compute desired heading toward next point
-  const lookAheadDist = Math.min(40, totalLen - travelledSoFar);
+  // ── Look-ahead steering ──────────────────────────────────
+  // Compute look-ahead point further ahead for smoother turns on fast aircraft
+  const lookAheadDist = Math.min(stats.speed * 0.9, totalLen - travelledSoFar);
   const lookAheadPos = pointAlongPath(ac.path, travelledSoFar + lookAheadDist);
-  const desiredHeading = angleToHeading(angleBetween(newPos, lookAheadPos));
+  const desiredHeading = angleToHeading(angleBetween(ac.position, lookAheadPos));
   const headingDelta = shortestAngleDelta(ac.heading, desiredHeading);
   const maxTurn = stats.turnRate * dt;
   const headingStep = Math.sign(headingDelta) * Math.min(Math.abs(headingDelta), maxTurn);
   const newHeading = (ac.heading + headingStep + 360) % 360;
 
-  // Apply light wind drift when not yet on approach
-  let driftedPos = newPos;
+  // ── Velocity-based movement (no teleport) ───────────────
+  // Move the aircraft by its own velocity vector, not by snapping to path
+  let newVelX = Math.cos(headingToAngle(newHeading)) * ac.speed;
+  let newVelY = Math.sin(headingToAngle(newHeading)) * ac.speed;
+
   if (windStrength > 0 && ac.state !== 'landing') {
-    const vel = { x: Math.cos(headingToAngle(newHeading)) * ac.speed, y: Math.sin(headingToAngle(newHeading)) * ac.speed };
-    const drifted = applyWindDrift(vel, windDir, windStrength * 0.15, dt);
-    driftedPos = { x: newPos.x + (drifted.x - vel.x) * dt, y: newPos.y + (drifted.y - vel.y) * dt };
+    const drifted = applyWindDrift({ x: newVelX, y: newVelY }, windDir, windStrength * 0.12, dt);
+    newVelX = drifted.x;
+    newVelY = drifted.y;
   }
+
+  const integratedPos = {
+    x: ac.position.x + newVelX * dt,
+    y: ac.position.y + newVelY * dt,
+  };
+
+  // ── Cross-track error correction ────────────────────────
+  // Gently pull the aircraft back toward the reference path point to prevent
+  // excessive drift on sharp turns. Strength varies by aircraft type.
+  const crossTrackK: Record<string, number> = {
+    cessna:     2.2,
+    jetliner:   1.4,  // larger turn radius → less aggressive correction
+    fighter:    3.0,  // highly agile
+    helicopter: 4.0,  // can correct instantly
+  };
+  const k = crossTrackK[ac.type] ?? 2.0;
+  const pathRef = pointAlongPath(ac.path, newTravelled);
+  const correctedPos = {
+    x: integratedPos.x + (pathRef.x - integratedPos.x) * k * dt,
+    y: integratedPos.y + (pathRef.y - integratedPos.y) * k * dt,
+  };
 
   return {
     ...ac,
-    position: driftedPos,
+    position: correctedPos,
     pathProgress: newProgress,
     heading: newHeading,
     fuel: newFuel,
     state: newState === ac.state ? ac.state : newState,
-    velocity: {
-      x: Math.cos(headingToAngle(newHeading)) * ac.speed,
-      y: Math.sin(headingToAngle(newHeading)) * ac.speed,
-    },
+    velocity: { x: newVelX, y: newVelY },
   };
 }
 
