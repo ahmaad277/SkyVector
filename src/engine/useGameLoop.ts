@@ -107,9 +107,23 @@ export function useGameLoop(options: UseGameLoopOptions) {
         return;
       }
 
-      const delayedVIPOrMayday = newState.aircraft.find(a => 
-        (a.isVIP || a.isEmergency) && a.state !== 'landed' && a.state !== 'crashed' && (now - a.spawnTime > 15000)
-      );
+      const delayedVIPOrMayday = newState.aircraft.find(a => {
+        if ((a.isVIP || a.isEmergency) && a.state !== 'landed' && a.state !== 'crashed') {
+          // Calculate distance to nearest runway
+          let minDistance = Infinity;
+          for (const runway of newState.runways) {
+            const dx = a.position.x - runway.x;
+            const dy = a.position.y - runway.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < minDistance) minDistance = dist;
+          }
+          
+          // Base time 20s + up to 15s extra based on distance (assuming max distance ~800)
+          const allowedTimeMs = 20000 + (Math.min(minDistance, 800) / 800) * 15000;
+          return (now - a.spawnTime > allowedTimeMs);
+        }
+        return false;
+      });
 
       if (delayedVIPOrMayday) {
         newState.aircraft = newState.aircraft.map(a => 

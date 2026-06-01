@@ -519,7 +519,19 @@ function drawAircraft(
   // ── Emergency / VIP badge ──────────────────────────────────
   if (ac.isEmergency || ac.isVIP) {
     const timeInAir = Date.now() - ac.spawnTime;
-    const timeLeft = Math.max(0, 15 - Math.floor(timeInAir / 1000));
+    
+    // Calculate allowed time based on distance to nearest runway
+    let minDistance = Infinity;
+    for (const runway of state.runways) {
+      const dx = ac.position.x - runway.x;
+      const dy = ac.position.y - runway.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < minDistance) minDistance = dist;
+    }
+    
+    // Base 20s + up to 15s based on distance
+    const allowedTimeMs = 20000 + (Math.min(minDistance, 800) / 800) * 15000;
+    const timeLeft = Math.max(0, Math.ceil((allowedTimeMs - timeInAir) / 1000));
     const timerText = `${timeLeft}s`;
 
     if (ac.isEmergency) {
