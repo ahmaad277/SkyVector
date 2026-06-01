@@ -120,11 +120,13 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute',
     inset: 0,
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
     background: 'rgba(11,19,43,0.92)',
     fontFamily: '"Courier New", monospace',
     backdropFilter: 'blur(2px)',
+    overflowY: 'auto',
+    padding: '40px 0',
   },
   card: {
     display: 'flex',
@@ -138,6 +140,7 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: 380,
     width: '90%',
     boxShadow: '0 0 40px rgba(255,0,60,0.15)',
+    margin: 'auto',
   },
   crashIcon: {
     fontSize: 52,

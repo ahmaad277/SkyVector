@@ -36,11 +36,13 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute',
     inset: 0,
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
     background: 'rgba(11,19,43,0.88)',
     fontFamily: '"Courier New", monospace',
     backdropFilter: 'blur(2px)',
+    overflowY: 'auto',
+    padding: '40px 0',
   },
   card: {
     display: 'flex',
@@ -52,6 +54,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(0,255,65,0.2)',
     borderRadius: 8,
     minWidth: 260,
+    margin: 'auto',
   },
   icon: { fontSize: 40 },
   title: {
