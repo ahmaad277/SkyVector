@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import type { GameState, LevelConfig, Aircraft } from '../types/game.types';
+import type { GameState, LevelConfig } from '../types/game.types';
 import { updateAircraft } from '../entities/Aircraft';
 import { spawnAircraft } from '../entities/AircraftFactory';
 import { checkCollisions, checkLandings, updateCombo } from './CollisionEngine';
@@ -8,13 +8,9 @@ import {
   generateEvent,
   applyEventToState,
   expireEvent,
-  nextEventTime,
 } from './EventBus';
-import { simplifyPath, smoothPath } from '../utils/pathMath';
 import { LEVELS } from '../levels';
 
-const TARGET_FPS = 60;
-const FRAME_MS = 1000 / TARGET_FPS;
 
 interface UseGameLoopOptions {
   gameStateRef: React.MutableRefObject<GameState>;

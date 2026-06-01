@@ -51,7 +51,7 @@ export default function HUD({
   onPause,
 }: HUDProps) {
   const config = LEVELS[level - 1] ?? LEVELS[0];
-  const { current: rank, next: nextRank, progress: rankProgress } = getRankInfo(totalXP);
+  const { current: rank, progress: rankProgress } = getRankInfo(totalXP);
   const comboColor = getComboColor(combo.multiplier);
 
   const [eventAnim, setEventAnim] = useState(false);

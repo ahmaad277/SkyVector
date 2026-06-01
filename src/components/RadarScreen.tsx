@@ -324,10 +324,6 @@ function drawRadarSweep(ctx: CanvasRenderingContext2D, W: number, H: number, ang
   const angleRad = (angleDeg * Math.PI) / 180;
   const spread = (25 * Math.PI) / 180;
 
-  const grad = ctx.createConicalGradient
-    ? null  // Not standard yet
-    : null;
-
   // Draw sweep wedge manually
   ctx.save();
   ctx.beginPath();
@@ -360,8 +356,7 @@ function drawRadarSweep(ctx: CanvasRenderingContext2D, W: number, H: number, ang
 }
 
 // ── Event overlay ─────────────────────────────────────────────
-function drawEventOverlay(ctx: CanvasRenderingContext2D, W: number, H: number, state: GameState) {
-  const ev = state.activeEvent!;
+function drawEventOverlay(ctx: CanvasRenderingContext2D, W: number, H: number, _state: GameState) {
   ctx.save();
   ctx.fillStyle = COLORS.EVENT_OVERLAY;
   ctx.fillRect(0, 0, W, H);

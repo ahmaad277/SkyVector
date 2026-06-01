@@ -41,7 +41,7 @@ export default function App() {
 
   // ── Hooks ────────────────────────────────────────────────
   const { play } = useAudio();
-  const { profile, missions, saveGameResult, progressMission } = useSupabase();
+  const { profile, saveGameResult, progressMission } = useSupabase();
 
   // ── Rendering (called from game loop) ────────────────────
   const renderFrameCb = useCallback(
@@ -107,7 +107,7 @@ export default function App() {
   );
 
   const handleLanding = useCallback(
-    (callsign: string, isVIP: boolean, isEmergency: boolean) => {
+    (_callsign: string, isVIP: boolean, isEmergency: boolean) => {
       if (isVIP) {
         play('landing_vip');
         progressMission('vip_land', 1);
