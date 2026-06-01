@@ -249,7 +249,7 @@ export function randomIntBetween(min: number, max: number): number {
 }
 
 /** Random spawn position on the edge of the canvas */
-export function randomEdgeSpawn(width: number, height: number, margin = 40): Vec2 {
+export function randomEdgeSpawn(width: number, height: number, margin = 10): Vec2 {
   const side = randomIntBetween(0, 3);
   switch (side) {
     case 0: return { x: randomBetween(margin, width - margin), y: margin };          // top

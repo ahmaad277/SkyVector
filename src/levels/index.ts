@@ -35,7 +35,7 @@ const LEVEL_1: LevelConfig = {
     },
   ],
   spawnRateMs: 6000,
-  maxAircraft: 2,
+  maxAircraft: 3,
   allowedTypes: ['cessna', 'jetliner', 'helicopter'],
   typeWeights: { cessna: 4, jetliner: 3, fighter: 0, helicopter: 2 },
   hasRadarSweep: false,
