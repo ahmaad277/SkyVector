@@ -251,11 +251,12 @@ export function randomIntBetween(min: number, max: number): number {
 /** Random spawn position on the edge of the canvas */
 export function randomEdgeSpawn(width: number, height: number, margin = 10): Vec2 {
   const side = randomIntBetween(0, 3);
+  const topMargin = 85; // Extra margin at the top to avoid spawning under the HUD
   switch (side) {
-    case 0: return { x: randomBetween(margin, width - margin), y: margin };          // top
-    case 1: return { x: width - margin, y: randomBetween(margin, height - margin) }; // right
+    case 0: return { x: randomBetween(margin, width - margin), y: topMargin };          // top
+    case 1: return { x: width - margin, y: randomBetween(topMargin, height - margin) }; // right
     case 2: return { x: randomBetween(margin, width - margin), y: height - margin }; // bottom
-    default: return { x: margin, y: randomBetween(margin, height - margin) };        // left
+    default: return { x: margin, y: randomBetween(topMargin, height - margin) };        // left
   }
 }
 
