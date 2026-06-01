@@ -20,6 +20,7 @@ export function getActiveApproachHeading(baseAngle: number, windDir?: number, wi
 
 export function createRunway(
   id: string,
+  airportId: string,
   type: RunwayType,
   position: Vec2,
   angle: number,
@@ -33,6 +34,7 @@ export function createRunway(
   const { length, width } = dims[type];
   return {
     id,
+    airportId,
     type,
     position,
     angle,
@@ -68,6 +70,17 @@ export function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway, now: n
 
   if (type === 'helipad') {
     drawHelipad(ctx, width, closed);
+    if (!closed) {
+      ctx.font = 'bold 12px "JetBrains Mono","Courier New",monospace';
+      ctx.fillStyle = '#00F0FF';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,240,255,0.7)';
+      ctx.shadowBlur = 5;
+      ctx.fillText(label, 0, width / 2 + 12);
+      ctx.shadowBlur = 0;
+      ctx.textBaseline = 'alphabetic';
+    }
     // Helipad closed label in world space
     if (closed) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);

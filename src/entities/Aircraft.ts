@@ -83,7 +83,8 @@ export function createAircraft(
   type: AircraftType,
   position: Vec2,
   heading: number,
-  targetRunwayId: string,
+  targetAirportId: string,
+  targetRunwayId: string | null = null,
   isEmergency = false,
   isVIP = false
 ): Aircraft {
@@ -113,6 +114,7 @@ export function createAircraft(
     speed: stats.speed,
     turnRadius: stats.turnRadius,
     separationRadius: stats.separationRadius,
+    targetAirportId,
     targetRunwayId,
     path: [],
     pathProgress: 0,

@@ -30,6 +30,7 @@ export interface Aircraft {
   speed: number;           // px/sec
   turnRadius: number;      // px
   separationRadius: number;
+  targetAirportId: string | null;
   targetRunwayId: string | null;
   path: Vec2[];            // drawn path waypoints
   pathProgress: number;    // 0-1 along path
@@ -47,6 +48,7 @@ export interface Aircraft {
 
 export interface Runway {
   id: string;
+  airportId: string;
   type: RunwayType;
   position: Vec2;
   angle: number;           // degrees — approach heading
@@ -57,10 +59,17 @@ export interface Runway {
   closedUntil: number;     // timestamp ms, 0 = always open
 }
 
+export interface AirportInfo {
+  id: string;
+  icao: string;
+  name: string;
+}
+
 export interface LevelConfig {
   id: number;
   name: string;
   subtitle: string;
+  airport: AirportInfo;
   runways: Omit<Runway, 'isOpen' | 'closedUntil'>[];
   spawnRateMs: number;        // time between spawns
   maxAircraft: number;

@@ -10,6 +10,7 @@ import {
   expireEvent,
 } from './EventBus';
 import { LEVELS } from '../levels';
+import { getLandingTargetForLevel } from '../utils/levelProgress';
 
 
 interface UseGameLoopOptions {
@@ -214,7 +215,7 @@ export function useGameLoop(options: UseGameLoopOptions) {
       );
 
       // ── 8. Level complete check ───────────────────────────
-      if (newState.totalLandings >= 15 * newState.level && newState.level < LEVELS.length) {
+      if (newState.totalLandings >= getLandingTargetForLevel(newState.level) && newState.level < LEVELS.length) {
         isRunningRef.current = false;
         gameStateRef.current = { ...newState, phase: 'levelcomplete' };
         renderFrame(gameStateRef.current, canvas);

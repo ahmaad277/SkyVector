@@ -33,7 +33,6 @@ export function spawnAircraft(
 
   if (validRunways.length === 0) return null;
 
-  const targetRunway = validRunways[Math.floor(Math.random() * validRunways.length)];
   const spawnPos = randomEdgeSpawn(canvasWidth, canvasHeight);
   const heading = inwardHeading(spawnPos, canvasWidth, canvasHeight) + randomBetween(-15, 15);
 
@@ -46,7 +45,8 @@ export function spawnAircraft(
     type,
     spawnPos,
     (heading + 360) % 360,
-    targetRunway.id,
+    config.airport.id,
+    null,
     isEmergency,
     isVIP
   );

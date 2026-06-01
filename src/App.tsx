@@ -300,6 +300,7 @@ export default function App() {
             highScore={highScore}
             combo={combo}
             level={gameStateRef.current.level}
+            totalLandings={gameStateRef.current.totalLandings}
             totalXP={profile.totalXP}
             activeEvent={activeEvent}
             aircraftCount={aircraftCount}

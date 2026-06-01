@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import type { GameState, GameEvent, PlayerRank } from '../types/game.types';
 import { COLORS, getComboColor } from '../utils/colorPalette';
 import { LEVELS } from '../levels';
+import { getLandingTargetForLevel } from '../utils/levelProgress';
 
 // ── Rank definitions ─────────────────────────────────────────
 const RANKS: { rank: PlayerRank; minXP: number; color: string; badge: string }[] = [
@@ -34,6 +35,7 @@ interface HUDProps {
   highScore: number;
   combo: GameState['combo'];
   level: number;
+  totalLandings: number;
   totalXP: number;
   activeEvent: GameEvent | null;
   aircraftCount: number;
@@ -45,12 +47,15 @@ export default function HUD({
   highScore,
   combo,
   level,
+  totalLandings,
   totalXP,
   activeEvent,
   aircraftCount,
   onPause,
 }: HUDProps) {
   const config = LEVELS[level - 1] ?? LEVELS[0];
+  const landingTarget = getLandingTargetForLevel(level);
+  const remainingLandings = Math.max(0, landingTarget - totalLandings);
   const { current: rank, progress: rankProgress } = getRankInfo(totalXP);
   const comboColor = getComboColor(combo.multiplier);
 
@@ -95,11 +100,15 @@ export default function HUD({
           </span>
         </div>
 
-        {/* Level */}
+        {/* Landing target */}
         <div style={{ ...styles.panel, textAlign: 'center', position: 'relative' }}>
-          <span style={styles.label}>LEVEL</span>
-          <span style={{ ...styles.bigValue, color: COLORS.HUD_ACCENT }}>{level} / {LEVELS.length}</span>
-          <span style={{ ...styles.small, color: COLORS.HUD_DIM }}>{config.name}</span>
+          <span style={styles.label}>TO WIN</span>
+          <span style={{ ...styles.bigValue, color: COLORS.HUD_ACCENT }}>
+            {totalLandings} / {landingTarget}
+          </span>
+          <span style={{ ...styles.small, color: COLORS.HUD_DIM }}>
+            {remainingLandings} LEFT · {config.airport.icao}
+          </span>
 
           {/* Combo Bar (transparent under level) */}
           {combo.count > 0 && (

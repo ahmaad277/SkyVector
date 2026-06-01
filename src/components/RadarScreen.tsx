@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react';
-import type { GameState, Aircraft, Vec2 } from '../types/game.types';
+import type { GameState, Aircraft, Runway, Vec2 } from '../types/game.types';
 import { COLORS, getAircraftColor, getFuelColor, getRingColor } from '../utils/colorPalette';
-import { drawRunway, isOnRunway, getDynamicRunwayAngle, getActiveApproachHeading } from '../entities/Runway';
+import { drawRunway, isOnRunway } from '../entities/Runway';
 import { isSeparationViolated } from '../entities/Aircraft';
 import { canvasPoint, simplifyPath, smoothPath, vecDist, headingToAngle } from '../utils/pathMath';
 import { AIRCRAFT_STATS } from '../entities/Aircraft';
@@ -253,12 +253,11 @@ export function renderFrame(state: GameState, canvas: HTMLCanvasElement): void {
   for (const ac of state.aircraft) {
     if (ac.path.length > 1 && ac.state !== 'landed') {
       let isConnected = false;
-      if (ac.targetRunwayId) {
-        const targetRunway = state.runways.find(r => r.id === ac.targetRunwayId);
-        if (targetRunway) {
-          const lastPoint = ac.path[ac.path.length - 1];
-          isConnected = isOnRunway(lastPoint, targetRunway, state.windDirection, state.windStrength);
-        }
+      if (ac.targetAirportId) {
+        const lastPoint = ac.path[ac.path.length - 1];
+        isConnected = getAcceptingAirportRunways(state, ac).some((runway) =>
+          isOnRunway(lastPoint, runway, state.windDirection, state.windStrength)
+        );
       }
       drawFlightPath(ctx, ac, state.selectedAircraftId === ac.id, isConnected);
     }
@@ -268,12 +267,11 @@ export function renderFrame(state: GameState, canvas: HTMLCanvasElement): void {
   if (state.isDrawing && state.drawingPath.length > 1) {
     let isConnected = false;
     const selectedAc = state.aircraft.find(a => a.id === state.selectedAircraftId);
-    if (selectedAc && selectedAc.targetRunwayId) {
-      const targetRunway = state.runways.find(r => r.id === selectedAc.targetRunwayId);
-      if (targetRunway) {
-        const lastPoint = state.drawingPath[state.drawingPath.length - 1];
-        isConnected = isOnRunway(lastPoint, targetRunway, state.windDirection, state.windStrength);
-      }
+    if (selectedAc?.targetAirportId) {
+      const lastPoint = state.drawingPath[state.drawingPath.length - 1];
+      isConnected = getAcceptingAirportRunways(state, selectedAc).some((runway) =>
+        isOnRunway(lastPoint, runway, state.windDirection, state.windStrength)
+      );
     }
     drawPreviewPath(ctx, state.drawingPath, isConnected);
   }
@@ -438,6 +436,15 @@ function drawPreviewPath(ctx: CanvasRenderingContext2D, points: Vec2[], isConnec
   ctx.restore();
 }
 
+function getAcceptingAirportRunways(state: GameState, ac: Aircraft): Runway[] {
+  return state.runways.filter((runway) => {
+    if (runway.airportId !== ac.targetAirportId) return false;
+    if (ac.type === 'helicopter') return runway.type === 'helipad';
+    if (ac.type === 'cessna') return runway.type === 'short' || runway.type === 'long';
+    return runway.type === 'long';
+  });
+}
+
 // ── Aircraft visibility (IFR mode) ───────────────────────────
 function isVisible(ac: Aircraft, state: GameState, W: number, H: number): boolean {
   const config = LEVELS[state.level - 1] ?? LEVELS[0];
@@ -505,39 +512,18 @@ function drawAircraft(
   ctx.textAlign = 'left';
   ctx.fillText(ac.callsign, stats.size + 8, -stats.size + 4);
 
-  // ── Target runway designator — centred BELOW the aircraft in blue ──
-  if (ac.targetRunwayId) {
-    const targetRunway = state.runways.find(r => r.id === ac.targetRunwayId);
-    let designator = '';
+  // ── Target airport — centred BELOW the aircraft in blue ──
+  if (ac.targetAirportId) {
+    const config = LEVELS[state.level - 1] ?? LEVELS[0];
+    const airportCode = config.airport.id === ac.targetAirportId ? config.airport.icao : ac.targetAirportId.toUpperCase();
 
-    if (targetRunway) {
-      if (targetRunway.type === 'helipad') {
-        // Helipad: just use the label directly
-        designator = targetRunway.label;
-      } else {
-        // Fixed runway: show the active approach designator matching what's on the runway
-        const dynAngle = getDynamicRunwayAngle(
-          targetRunway.angle, state.windDirection, state.windStrength
-        );
-        const activeHeading = getActiveApproachHeading(
-          dynAngle, state.windDirection, state.windStrength
-        );
-        const activeAtNegEnd =
-          Math.abs((((activeHeading - dynAngle) + 540) % 360) - 180) < 90;
-        const parts = targetRunway.label.split('/');
-        designator = activeAtNegEnd ? (parts[0] ?? '') : (parts[1] ?? parts[0] ?? '');
-      }
-    }
-
-    if (designator) {
-      ctx.font = `bold 14px "JetBrains Mono","Courier New",monospace`;
-      ctx.fillStyle = '#00F0FF';
-      ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(0,240,255,0.65)';
-      ctx.shadowBlur = 5;
-      ctx.fillText(designator, 0, stats.size + 18);
-      ctx.shadowBlur = 0;
-    }
+    ctx.font = `bold 14px "JetBrains Mono","Courier New",monospace`;
+    ctx.fillStyle = '#00F0FF';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,240,255,0.65)';
+    ctx.shadowBlur = 5;
+    ctx.fillText(airportCode, 0, stats.size + 18);
+    ctx.shadowBlur = 0;
   }
 
   // ── Fuel bar ───────────────────────────────────────────────
