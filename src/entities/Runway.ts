@@ -225,6 +225,25 @@ function drawHelipad(ctx: CanvasRenderingContext2D, size: number, closed: boolea
   ctx.textBaseline = 'alphabetic';
 }
 
+// ── Active threshold world-space position ────────────────────
+/** Returns the position of the active approach threshold in world coordinates.
+ *  Aircraft must be near this point (not just anywhere on the runway) to land. */
+export function getActiveThresholdPosition(
+  runway: Runway,
+  windDir?: number,
+  windStrength?: number
+): Vec2 {
+  const angle = getDynamicRunwayAngle(runway.angle, windDir, windStrength);
+  const activeHeading = getActiveApproachHeading(angle, windDir, windStrength);
+  const activeAtNegativeEnd = Math.abs(shortestAngleDelta(activeHeading, angle)) < 90;
+  const rad = headingToAngle(angle);
+  const sign = activeAtNegativeEnd ? -1 : 1;
+  return {
+    x: runway.position.x + Math.cos(rad) * (runway.length / 2) * sign,
+    y: runway.position.y + Math.sin(rad) * (runway.length / 2) * sign,
+  };
+}
+
 // ── Landing check helper ─────────────────────────────────────
 export function isOnRunway(pos: Vec2, runway: Runway, windDir?: number, windStrength?: number): boolean {
   if (runway.type === 'helipad') {

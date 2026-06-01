@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react';
 import type { GameState, Aircraft, Vec2 } from '../types/game.types';
 import { COLORS, getAircraftColor, getFuelColor, getRingColor } from '../utils/colorPalette';
-import { drawRunway, isOnRunway } from '../entities/Runway';
+import { drawRunway, isOnRunway, getDynamicRunwayAngle, getActiveApproachHeading } from '../entities/Runway';
 import { isSeparationViolated } from '../entities/Aircraft';
 import { canvasPoint, simplifyPath, smoothPath, vecDist, headingToAngle } from '../utils/pathMath';
 import { AIRCRAFT_STATS } from '../entities/Aircraft';
@@ -505,18 +505,39 @@ function drawAircraft(
   ctx.textAlign = 'left';
   ctx.fillText(ac.callsign, stats.size + 8, -stats.size + 4);
 
-  // ── Target runway — centred BELOW the aircraft in blue ──────
-  const rwyShort = ac.targetRunwayId
-    ? ac.targetRunwayId.replace(/^rwy-/i, '').replace(/^hpad-/i, 'H').toUpperCase()
-    : '';
-  if (rwyShort) {
-    ctx.font = `bold 14px "Courier New", monospace`;
-    ctx.fillStyle = '#00F0FF';
-    ctx.textAlign = 'center';
-    ctx.shadowColor = 'rgba(0,240,255,0.65)';
-    ctx.shadowBlur = 5;
-    ctx.fillText(rwyShort, 0, stats.size + 18);
-    ctx.shadowBlur = 0;
+  // ── Target runway designator — centred BELOW the aircraft in blue ──
+  if (ac.targetRunwayId) {
+    const targetRunway = state.runways.find(r => r.id === ac.targetRunwayId);
+    let designator = '';
+
+    if (targetRunway) {
+      if (targetRunway.type === 'helipad') {
+        // Helipad: just use the label directly
+        designator = targetRunway.label;
+      } else {
+        // Fixed runway: show the active approach designator matching what's on the runway
+        const dynAngle = getDynamicRunwayAngle(
+          targetRunway.angle, state.windDirection, state.windStrength
+        );
+        const activeHeading = getActiveApproachHeading(
+          dynAngle, state.windDirection, state.windStrength
+        );
+        const activeAtNegEnd =
+          Math.abs((((activeHeading - dynAngle) + 540) % 360) - 180) < 90;
+        const parts = targetRunway.label.split('/');
+        designator = activeAtNegEnd ? (parts[0] ?? '') : (parts[1] ?? parts[0] ?? '');
+      }
+    }
+
+    if (designator) {
+      ctx.font = `bold 14px "Courier New", monospace`;
+      ctx.fillStyle = '#00F0FF';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(0,240,255,0.65)';
+      ctx.shadowBlur = 5;
+      ctx.fillText(designator, 0, stats.size + 18);
+      ctx.shadowBlur = 0;
+    }
   }
 
   // ── Fuel bar ───────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import type { Aircraft, Runway, GameState } from '../types/game.types';
 import { isSeparationViolated, isCollision } from '../entities/Aircraft';
-import { isOnRunway, getDynamicRunwayAngle, getActiveApproachHeading } from '../entities/Runway';
+import { isOnRunway, getDynamicRunwayAngle, getActiveApproachHeading, getActiveThresholdPosition } from '../entities/Runway';
 import {
   isAlignedWithRunway,
   vecDist,
@@ -86,26 +86,28 @@ export function checkLandings(
     if (!runway.isOpen || (runway.closedUntil > 0 && now < runway.closedUntil)) continue;
 
     const stats = AIRCRAFT_STATS[ac.type];
-    const dist = vecDist(ac.position, runway.position);
 
-    // Helicopter: land from any angle, just close enough
+    // Helicopter → land at helipad center only (no direction check)
     if (ac.type === 'helicopter' && runway.type === 'helipad') {
+      const dist = vecDist(ac.position, runway.position);
       if (dist < stats.landingDistance) {
         results.push(buildLandingResult(ac));
       }
       continue;
     }
 
-    // Fixed-wing: must be aligned AND close enough
+    // Fixed-wing: must be aligned AND near the active threshold (not anywhere on the strip)
     const dynamicAngle = getDynamicRunwayAngle(runway.angle, windDir, windStrength);
     const activeHeading = getActiveApproachHeading(dynamicAngle, windDir, windStrength);
-    
-    // All aircraft must land in the active approach direction — no exceptions
     const aligned = isAlignedWithRunway(ac.heading, activeHeading, stats.approachTolerance);
-    
-    const onRunway = isOnRunway(ac.position, runway, windDir, windStrength);
 
-    if ((aligned && dist < stats.landingDistance) || onRunway) {
+    if (!aligned) continue;
+
+    // Distance measured from the ACTIVE THRESHOLD, not runway center
+    const threshold = getActiveThresholdPosition(runway, windDir, windStrength);
+    const distToThreshold = vecDist(ac.position, threshold);
+
+    if (distToThreshold < stats.landingDistance) {
       results.push(buildLandingResult(ac));
     }
   }
