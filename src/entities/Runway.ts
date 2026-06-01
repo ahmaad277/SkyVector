@@ -26,9 +26,9 @@ export function createRunway(
   label: string
 ): Runway {
   const dims: Record<RunwayType, { length: number; width: number }> = {
-    short:   { length: 80,  width: 12 },
-    long:    { length: 120, width: 16 },
-    helipad: { length: 36,  width: 36 },
+    short:   { length: 120, width: 18 },
+    long:    { length: 170, width: 22 },
+    helipad: { length: 50,  width: 50 },
   };
   const { length, width } = dims[type];
   return {
@@ -79,42 +79,77 @@ export function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway, now: n
   } else {
     drawStrip(ctx, length, width, closed, activeAtNegativeEnd);
 
-    // Draw runway designator numbers at each threshold end (while still in rotated ctx)
     if (!closed) {
-      ctx.font = 'bold 13px "JetBrains Mono", "Courier New", monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      // Active approach end label (cyan, prominent)
+      // ── Designator numbers at each threshold ──────────────
+      ctx.font = 'bold 14px "JetBrains Mono", "Courier New", monospace';
+
+      // Active end: cyan + glow
       const activeX = activeAtNegativeEnd ? -length / 2 + 2 : length / 2 - 2;
       ctx.fillStyle = '#00F0FF';
-      ctx.shadowColor = 'rgba(0,240,255,0.7)';
-      ctx.shadowBlur = 6;
-      ctx.fillText(
-        activeAtNegativeEnd ? negLabel : posLabel,
-        activeX,
-        -width / 2 - 9
-      );
+      ctx.shadowColor = 'rgba(0,240,255,0.8)';
+      ctx.shadowBlur = 7;
+      ctx.fillText(activeAtNegativeEnd ? negLabel : posLabel, activeX, -width / 2 - 11);
       ctx.shadowBlur = 0;
 
-      // Inactive end label (dim)
+      // Inactive end: dim white
       if (posLabel) {
         const inactiveX = activeAtNegativeEnd ? length / 2 - 2 : -length / 2 + 2;
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.fillText(
-          activeAtNegativeEnd ? posLabel : negLabel,
-          inactiveX,
-          -width / 2 - 9
-        );
+        ctx.fillText(activeAtNegativeEnd ? posLabel : negLabel, inactiveX, -width / 2 - 11);
       }
+
+      // ── Approach arrow: outside the threshold, pointing INTO the runway ─
+      // Drawn BEYOND the approach end, arrow points in landing direction
+      const ARROW_OFFSET = 22; // px beyond the threshold
+      const ARROW_LEN    = 22;
+      const ARROW_HEAD   = 8;
+      ctx.strokeStyle = '#00F0FF';
+      ctx.fillStyle   = '#00F0FF';
+      ctx.lineWidth   = 2.5;
+      ctx.shadowColor = 'rgba(0,240,255,0.9)';
+      ctx.shadowBlur  = 8;
+
+      if (activeAtNegativeEnd) {
+        // Aircraft land flying in +X direction → approach from the -X side
+        // Arrow placed at x = -length/2 - ARROW_OFFSET, pointing right (+X)
+        const ax = -length / 2 - ARROW_OFFSET;
+        ctx.beginPath();
+        ctx.moveTo(ax - ARROW_LEN / 2, 0);
+        ctx.lineTo(ax + ARROW_LEN / 2, 0);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(ax + ARROW_LEN / 2, 0);
+        ctx.lineTo(ax + ARROW_LEN / 2 - ARROW_HEAD, -ARROW_HEAD * 0.6);
+        ctx.lineTo(ax + ARROW_LEN / 2 - ARROW_HEAD,  ARROW_HEAD * 0.6);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        // Aircraft land flying in -X direction → approach from the +X side
+        // Arrow placed at x = +length/2 + ARROW_OFFSET, pointing left (-X)
+        const ax = length / 2 + ARROW_OFFSET;
+        ctx.beginPath();
+        ctx.moveTo(ax + ARROW_LEN / 2, 0);
+        ctx.lineTo(ax - ARROW_LEN / 2, 0);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(ax - ARROW_LEN / 2, 0);
+        ctx.lineTo(ax - ARROW_LEN / 2 + ARROW_HEAD, -ARROW_HEAD * 0.6);
+        ctx.lineTo(ax - ARROW_LEN / 2 + ARROW_HEAD,  ARROW_HEAD * 0.6);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
       ctx.textBaseline = 'alphabetic';
+
     } else {
-      // Closed indicator
-      ctx.font = 'bold 11px "Courier New", monospace';
+      ctx.font = 'bold 13px "Courier New", monospace';
       ctx.fillStyle = 'rgba(255,0,60,0.9)';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('CLOSED', 0, -width / 2 - 9);
+      ctx.fillText('CLOSED', 0, -width / 2 - 11);
       ctx.textBaseline = 'alphabetic';
     }
   }
@@ -182,7 +217,7 @@ function drawHelipad(ctx: CanvasRenderingContext2D, size: number, closed: boolea
   ctx.stroke();
 
   // "H" letter
-  ctx.font = `bold ${size * 0.55}px "Courier New", monospace`;
+  ctx.font = `bold ${size * 0.5}px "Courier New", monospace`;
   ctx.fillStyle = closed ? '#FF003C' : '#FFFFFF';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

@@ -100,13 +100,8 @@ export function checkLandings(
     const dynamicAngle = getDynamicRunwayAngle(runway.angle, windDir, windStrength);
     const activeHeading = getActiveApproachHeading(dynamicAngle, windDir, windStrength);
     
-    let aligned = isAlignedWithRunway(ac.heading, activeHeading, stats.approachTolerance);
-    
-    // Emergency can land from either side
-    if (!aligned && ac.isEmergency) {
-      const reverseHeading = (activeHeading + 180) % 360;
-      aligned = isAlignedWithRunway(ac.heading, reverseHeading, stats.approachTolerance);
-    }
+    // All aircraft must land in the active approach direction — no exceptions
+    const aligned = isAlignedWithRunway(ac.heading, activeHeading, stats.approachTolerance);
     
     const onRunway = isOnRunway(ac.position, runway, windDir, windStrength);
 

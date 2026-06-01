@@ -499,29 +499,25 @@ function drawAircraft(
   drawAircraftShape(ctx, ac.type, stats.size, color, selected);
   ctx.rotate(-headingToAngle(ac.heading));
 
-  // ── Callsign label ─────────────────────────────────────────
-  ctx.font = `bold 15px "Courier New", monospace`;
+  // ── Callsign label (right of aircraft) ─────────────────────
+  ctx.font = `bold 16px "Courier New", monospace`;
   ctx.fillStyle = color;
   ctx.textAlign = 'left';
-  ctx.fillText(ac.callsign, stats.size + 7, -stats.size + 3);
+  ctx.fillText(ac.callsign, stats.size + 8, -stats.size + 4);
 
-  // Aircraft type + target runway on second line
-  const typeLabel: Record<string, string> = {
-    cessna: 'C172', jetliner: 'B738', fighter: 'F-16', helicopter: 'HELO',
-  };
-  // Shorten runway id for display: "rwy-09L" → "09L", "hpad-01" → "H1"
+  // ── Target runway — centred BELOW the aircraft in blue ──────
   const rwyShort = ac.targetRunwayId
     ? ac.targetRunwayId.replace(/^rwy-/i, '').replace(/^hpad-/i, 'H').toUpperCase()
     : '';
-  const subLine = rwyShort
-    ? `${typeLabel[ac.type] ?? ac.type.toUpperCase()} ▶${rwyShort}`
-    : (typeLabel[ac.type] ?? ac.type.toUpperCase());
-
-  ctx.font = `12px "Courier New", monospace`;
-  ctx.globalAlpha = 0.75;
-  ctx.fillStyle = rwyShort ? '#00F0FF' : color;
-  ctx.fillText(subLine, stats.size + 7, -stats.size + 18);
-  ctx.globalAlpha = 1;
+  if (rwyShort) {
+    ctx.font = `bold 14px "Courier New", monospace`;
+    ctx.fillStyle = '#00F0FF';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,240,255,0.65)';
+    ctx.shadowBlur = 5;
+    ctx.fillText(rwyShort, 0, stats.size + 18);
+    ctx.shadowBlur = 0;
+  }
 
   // ── Fuel bar ───────────────────────────────────────────────
   drawFuelBar(ctx, ac, stats.size);
