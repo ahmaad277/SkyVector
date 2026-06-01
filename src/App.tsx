@@ -3,15 +3,16 @@ import type { GameState, Vec2 } from './types/game.types';
 import RadarScreen, { renderFrame } from './components/RadarScreen';
 import HUD from './components/HUD';
 import MainMenu from './components/MainMenu';
+import StageSelectScreen from './components/StageSelectScreen';
 import GameOverScreen from './components/GameOverScreen';
 import PauseScreen from './components/PauseScreen';
 import Leaderboard from './components/Leaderboard';
 import { useGameLoop, createInitialGameState } from './engine/useGameLoop';
 import { useAudio } from './hooks/useAudio';
 import { useSupabase } from './hooks/useSupabase';
-import { simplifyPath, smoothPath } from './utils/pathMath';
+import { simplifyPath, smoothPath, findClosestForwardProgress } from './utils/pathMath';
 
-type AppScreen = 'menu' | 'game' | 'gameover' | 'leaderboard';
+type AppScreen = 'menu' | 'stage_select' | 'game' | 'gameover' | 'leaderboard';
 
 export default function App() {
   // ── UI state (React) ─────────────────────────────────────
@@ -188,11 +189,21 @@ export default function App() {
       setActiveEvent(null);
       setIsPaused(false);
       setSessionStart(Date.now());
+      localStorage.setItem('skyvector_last_level', String(level));
       setScreen('game');
       setTimeout(() => gameLoopRef.current?.start(), 50);
     },
     []
   );
+
+  const handleContinue = useCallback(() => {
+    const lastLevel = parseInt(localStorage.getItem('skyvector_last_level') ?? '1', 10);
+    handleStartLevel(lastLevel);
+  }, [handleStartLevel]);
+
+  const handleGoToStageSelect = useCallback(() => {
+    setScreen('stage_select');
+  }, []);
 
   const handlePause = useCallback(() => {
     gameLoopRef.current?.pause();
@@ -226,11 +237,23 @@ export default function App() {
   const handlePathDrawn = useCallback((aircraftId: string, path: Vec2[]) => {
     gameStateRef.current = {
       ...gameStateRef.current,
-      aircraft: gameStateRef.current.aircraft.map((a) =>
-        a.id === aircraftId
-          ? { ...a, path: smoothPath(simplifyPath([a.position, ...path], 8)), pathProgress: 0, state: a.state === 'holding' ? 'flying' : a.state }
-          : a
-      ),
+      aircraft: gameStateRef.current.aircraft.map((a) => {
+        if (a.id !== aircraftId) return a;
+        // Build path from raw drawn points (do NOT prepend a.position — that
+        // caused a "hook backwards" when the aircraft moved forward during drawing)
+        const fullPath = smoothPath(simplifyPath(path, 8));
+        // Find the closest forward point on the new path so the aircraft
+        // merges onto it without reversing direction
+        const startProgress = fullPath.length >= 2
+          ? findClosestForwardProgress(fullPath, a.position, a.heading)
+          : 0;
+        return {
+          ...a,
+          path: fullPath,
+          pathProgress: startProgress,
+          state: a.state === 'holding' ? 'flying' : a.state,
+        };
+      }),
       drawingPath: [],
       isDrawing: false,
     };
@@ -304,8 +327,20 @@ export default function App() {
       {/* Main Menu */}
       {screen === 'menu' && (
         <MainMenu
-          onStartLevel={handleStartLevel}
+          onContinue={handleContinue}
+          onNewGame={handleGoToStageSelect}
+          onLeaderboard={() => setScreen('leaderboard')}
+          onSettings={() => {/* placeholder */}}
           highScore={highScore}
+          canContinue={!!localStorage.getItem('skyvector_last_level')}
+        />
+      )}
+
+      {/* Stage Selection */}
+      {screen === 'stage_select' && (
+        <StageSelectScreen
+          onStartLevel={handleStartLevel}
+          onBack={() => setScreen('menu')}
           unlockedLevel={unlockedLevel}
         />
       )}

@@ -1,79 +1,125 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { COLORS } from '../utils/colorPalette';
-import { LEVELS } from '../levels';
 
 interface MainMenuProps {
-  onStartLevel: (level: number) => void;
+  onContinue: () => void;
+  onNewGame: () => void;
+  onLeaderboard: () => void;
+  onSettings: () => void;
   highScore: number;
-  unlockedLevel: number;
+  canContinue: boolean;
 }
 
-export default function MainMenu({ onStartLevel, highScore, unlockedLevel }: MainMenuProps) {
+export default function MainMenu({
+  onContinue,
+  onNewGame,
+  onLeaderboard,
+  onSettings,
+  highScore,
+  canContinue,
+}: MainMenuProps) {
+  const [hoveredBtn, setHoveredBtn] = useState<string | null>(null);
+
+  const buttons = [
+    { id: 'continue',    label: 'CONTINUE',    action: onContinue,    disabled: !canContinue },
+    { id: 'newgame',     label: 'NEW GAME',     action: onNewGame,     disabled: false },
+    { id: 'leaderboard', label: 'LEADERBOARD',  action: onLeaderboard, disabled: false },
+    { id: 'settings',    label: 'SETTINGS',     action: onSettings,    disabled: false },
+  ];
+
   return (
-    <div style={styles.overlay}>
-      {/* Subtle background decoration instead of dense rings */}
+    <div style={styles.root}>
+      {/* Radar background decoration */}
       <div style={styles.radarBg} aria-hidden="true">
-        {[150, 300].map((r) => (
-          <div key={r} style={{ ...styles.ring, width: r * 2, height: r * 2 }} />
+        <div style={styles.radarSweepWrap}>
+          <div style={styles.radarSweep} />
+        </div>
+        {[120, 230, 340].map((r, i) => (
+          <div
+            key={r}
+            className="radar-ring-animate"
+            style={{
+              ...styles.ring,
+              width: r * 2,
+              height: r * 2,
+              animationDelay: `${i * 1.1}s`,
+            }}
+          />
         ))}
       </div>
 
+      {/* Content card */}
       <div style={styles.card}>
         {/* Logo */}
-        <div style={styles.logo}>
-          <span style={styles.logoAccent}>SKY</span>
-          <span style={styles.logoMain}>VECTOR</span>
+        <div style={styles.logoWrap}>
+          <div style={styles.logo}>
+            <span style={styles.logoSky}>SKY</span>
+            <span style={styles.logoVector}>VECTOR</span>
+          </div>
+          <div style={styles.subtitle}>AIR COMMAND</div>
+          <div style={styles.tagline}>Radar Air Traffic Control</div>
         </div>
-        <div style={styles.subtitle}>AIR COMMAND</div>
-        <div style={styles.tagline}>Radar Air Traffic Control</div>
 
-        {/* High Score */}
+        {/* Personal best badge */}
         {highScore > 0 && (
           <div style={styles.hiBadge}>
-            <span style={{ color: COLORS.HUD_DIM, fontSize: 12, fontWeight: 600, letterSpacing: 1 }}>PERSONAL BEST</span>
-            <span style={{ color: COLORS.HUD_GOLD, fontSize: 26, fontWeight: 'bold' }}>
-              {highScore.toLocaleString()}
-            </span>
+            <span style={styles.hiLabel}>PERSONAL BEST</span>
+            <span style={styles.hiScore}>{highScore.toLocaleString()}</span>
           </div>
         )}
 
-        {/* Level Selection */}
-        <div style={styles.levelGrid}>
-          {LEVELS.map((lvl) => {
-            const locked = lvl.id > unlockedLevel;
+        {/* Navigation buttons */}
+        <div style={styles.btnStack}>
+          {buttons.map(({ id, label, action, disabled }) => {
+            const isHovered = hoveredBtn === id && !disabled;
             return (
               <button
-                key={lvl.id}
-                style={{ ...styles.levelBtn, ...(locked ? styles.locked : {}) }}
-                onClick={() => !locked && onStartLevel(lvl.id)}
-                disabled={locked}
-                title={locked ? 'Complete previous levels to unlock' : ''}
+                key={id}
+                style={{
+                  ...styles.btn,
+                  ...(disabled ? styles.btnDisabled : {}),
+                  ...(isHovered ? styles.btnHover : {}),
+                }}
+                onClick={action}
+                disabled={disabled}
+                onMouseEnter={() => setHoveredBtn(id)}
+                onMouseLeave={() => setHoveredBtn(null)}
+                onTouchStart={() => setHoveredBtn(id)}
+                onTouchEnd={() => setHoveredBtn(null)}
               >
-                <span style={styles.lvlNum}>LEVEL {lvl.id}</span>
-                <span style={styles.lvlName}>{lvl.name}</span>
-                <span style={styles.lvlSub}>{lvl.subtitle}</span>
-                {locked && <span style={styles.lockIcon}>🔒</span>}
+                <span style={disabled ? styles.btnTextDisabled : styles.btnText}>
+                  {label}
+                </span>
+                {!disabled && (
+                  <span style={{ ...styles.btnArrow, opacity: isHovered ? 1 : 0 }}>
+                    ›
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
+
+        <div style={styles.version}>v1.0 · SKYVECTOR</div>
       </div>
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  overlay: {
-    position: 'absolute',
+  root: {
+    position: 'fixed',
     inset: 0,
     display: 'flex',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'center',
     background: COLORS.BG_DEEP,
-    fontFamily: '"Courier New", monospace',
-    overflowY: 'auto',
-    padding: '40px 0',
+    overflow: 'hidden',
+    paddingTop: 'env(safe-area-inset-top)',
+    paddingBottom: 'env(safe-area-inset-bottom)',
   },
+
+  // ── Radar background ──
   radarBg: {
     position: 'absolute',
     inset: 0,
@@ -82,104 +128,175 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     pointerEvents: 'none',
   },
+  radarSweepWrap: {
+    position: 'absolute',
+    width: 700,
+    height: 700,
+    borderRadius: '50%',
+    overflow: 'hidden',
+    animation: 'radarSweep 6s linear infinite',
+  },
+  radarSweep: {
+    position: 'absolute',
+    inset: 0,
+    background:
+      'conic-gradient(from 0deg, transparent 0deg, rgba(57,255,20,0.10) 25deg, transparent 60deg)',
+    borderRadius: '50%',
+  },
   ring: {
     position: 'absolute',
     borderRadius: '50%',
-    border: `1px solid ${COLORS.RADAR_GRID}`,
+    border: `1px solid rgba(0, 240, 255, 0.12)`,
   },
+
+  // ── Content card ──
   card: {
     position: 'relative',
+    zIndex: 2,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 20,
-    padding: '32px 24px',
-    background: COLORS.BG_PANEL,
-    border: `1px solid rgba(0, 255, 65, 0.1)`,
+    gap: 24,
+    padding: '40px 32px 28px',
+    background: 'rgba(13, 27, 42, 0.72)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    border: '1px solid rgba(0, 240, 255, 0.15)',
     borderRadius: 20,
-    maxWidth: 480,
-    width: '90%',
-    boxShadow: `0 20px 50px rgba(0, 0, 0, 0.5)`,
-    margin: 'auto',
+    maxWidth: 400,
+    width: '88%',
+    boxShadow: '0 24px 64px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(0,240,255,0.02)',
+    animation: 'fadeInUp 0.5s ease both',
+  },
+
+  // ── Logo ──
+  logoWrap: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 4,
   },
   logo: {
-    fontSize: 56,
+    fontFamily: 'var(--font-title)',
+    fontSize: 52,
     fontWeight: 900,
-    letterSpacing: 4,
+    letterSpacing: 3,
     lineHeight: 1,
     display: 'flex',
     gap: 0,
   },
-  logoAccent: { color: COLORS.HUD_ACCENT },
-  logoMain: { color: '#FFFFFF' },
-  subtitle: {
-    fontSize: 16,
-    fontWeight: 400,
-    letterSpacing: 8,
-    color: COLORS.HUD_DIM,
-    marginTop: -20,
+  logoSky: {
+    color: '#00F0FF',
+    textShadow: '0 0 20px rgba(0,240,255,0.8), 0 0 40px rgba(0,240,255,0.35)',
   },
+  logoVector: {
+    color: '#FFFFFF',
+    textShadow: '0 0 12px rgba(255,255,255,0.3)',
+  },
+  subtitle: {
+    fontFamily: 'var(--font-title)',
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: 10,
+    color: 'rgba(0,240,255,0.5)',
+    marginTop: 2,
+  },
+  tagline: {
+    fontFamily: 'var(--font-ui)',
+    fontSize: 12,
+    fontWeight: 400,
+    color: 'rgba(255,255,255,0.35)',
+    letterSpacing: 1,
+    marginTop: 6,
+  },
+
+  // ── High Score badge ──
   hiBadge: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    padding: '12px 32px',
-    background: 'rgba(255, 215, 0, 0.05)',
-    border: `1px solid rgba(255, 215, 0, 0.2)`,
-    borderRadius: 8,
-    gap: 4,
     width: '100%',
+    padding: '10px 20px',
+    background: 'rgba(255,215,0,0.04)',
+    border: '1px solid rgba(255,215,0,0.18)',
+    borderRadius: 10,
+    gap: 2,
   },
-  levelGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: 12,
-    width: '100%',
+  hiLabel: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: 2,
+    color: 'rgba(255,215,0,0.55)',
   },
-  levelBtn: {
-    position: 'relative',
+  hiScore: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 28,
+    fontWeight: 700,
+    color: '#FFD700',
+    textShadow: '0 0 12px rgba(255,215,0,0.4)',
+  },
+
+  // ── Button stack ──
+  btnStack: {
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'flex-start',
-    padding: '18px 20px',
-    background: 'rgba(255, 255, 255, 0.03)',
-    border: `1px solid rgba(255, 255, 255, 0.08)`,
-    borderRadius: 12,
+    gap: 10,
+    width: '100%',
+  },
+  btn: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '14px 24px',
+    background: 'rgba(0, 240, 255, 0.04)',
+    border: '1px solid rgba(0, 240, 255, 0.22)',
+    borderRadius: 10,
     cursor: 'pointer',
-    color: '#FFFFFF',
-    fontFamily: 'inherit',
-    textAlign: 'left',
-    transition: 'all 0.2s ease',
-    gap: 4,
+    transition: 'all 0.18s ease',
+    boxShadow: 'inset 0 0 16px rgba(0,240,255,0.02)',
   },
-  locked: {
-    background: 'transparent',
-    border: '1px dashed rgba(255, 255, 255, 0.1)',
+  btnHover: {
+    background: 'rgba(0, 240, 255, 0.09)',
+    border: '1px solid rgba(0, 240, 255, 0.55)',
+    boxShadow: '0 0 18px rgba(0,240,255,0.25), inset 0 0 20px rgba(0,240,255,0.06)',
+    transform: 'translateY(-1px)',
+  },
+  btnDisabled: {
+    opacity: 0.28,
     cursor: 'not-allowed',
-    color: 'rgba(255,255,255,0.3)',
-    opacity: 0.5,
+    border: '1px dashed rgba(255,255,255,0.1)',
+    background: 'transparent',
+    boxShadow: 'none',
   },
-  lvlNum: {
-    fontSize: 11,
+  btnText: {
+    fontFamily: 'var(--font-title)',
+    fontSize: 13,
     fontWeight: 700,
-    color: COLORS.HUD_ACCENT,
-    letterSpacing: 2,
+    letterSpacing: 3,
+    color: '#00F0FF',
+    textShadow: '0 0 8px rgba(0,240,255,0.5)',
   },
-  lvlName: {
-    fontSize: 16,
-    fontWeight: 800,
-    color: 'inherit',
+  btnTextDisabled: {
+    fontFamily: 'var(--font-title)',
+    fontSize: 13,
+    fontWeight: 700,
+    letterSpacing: 3,
+    color: 'rgba(255,255,255,0.3)',
   },
-  lvlSub: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.5)',
-    marginTop: 2,
-    lineHeight: 1.3,
-  },
-  lockIcon: {
+  btnArrow: {
     position: 'absolute',
-    top: 18,
-    right: 16,
-    fontSize: 14,
+    right: 20,
+    fontSize: 20,
+    color: '#00F0FF',
+    transition: 'opacity 0.18s ease',
+  },
+
+  version: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.18)',
+    letterSpacing: 1,
   },
 };

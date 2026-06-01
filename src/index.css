@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -5,12 +7,15 @@
 }
 
 :root {
-  --color-bg: #0B132B;
-  --color-green: #00FF41;
-  --color-cyan: #00B4D8;
-  --color-red: #FF003C;
-  --color-gold: #FFD700;
-  --font-mono: "Courier New", "Lucida Console", monospace;
+  --color-bg:      #0B1325;
+  --color-panel:   #0D1B2A;
+  --color-green:   #39FF14;
+  --color-cyan:    #00F0FF;
+  --color-red:     #FF003C;
+  --color-gold:    #FFD700;
+  --font-title:    'Orbitron', 'Inter', sans-serif;
+  --font-ui:       'Inter', system-ui, sans-serif;
+  --font-mono:     'JetBrains Mono', 'Courier New', monospace;
 }
 
 html, body, #root {
@@ -18,8 +23,8 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
   background: var(--color-bg);
-  font-family: var(--font-mono);
-  color: var(--color-green);
+  font-family: var(--font-ui);
+  color: var(--color-cyan);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -30,19 +35,19 @@ html {
   touch-action: none;
 }
 
-/* Custom scrollbar for leaderboard */
+/* Slim scrollbar — cyan theme */
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 3px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(0,0,0,0.2);
+  background: rgba(0, 0, 0, 0.25);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0,255,65,0.25);
+  background: rgba(0, 240, 255, 0.3);
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0,255,65,0.4);
+  background: rgba(0, 240, 255, 0.55);
 }
 
 /* ── Keyframe animations ──────────────────────────────────── */
@@ -58,23 +63,44 @@ html {
 }
 
 @keyframes radarRing {
-  from { transform: scale(0.6); opacity: 0.5; }
-  to   { transform: scale(1.4); opacity: 0; }
+  from { transform: scale(0.6); opacity: 0.6; }
+  to   { transform: scale(1.6); opacity: 0; }
+}
+
+@keyframes radarSweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-6px); }
+  from { opacity: 0; transform: translateY(-8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Apply radar ring animation to menu rings */
-.radar-ring-animate {
-  animation: radarRing 3s ease-out infinite;
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Button hover styles */
+@keyframes cyberGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(0, 240, 255, 0.2); }
+  50%       { box-shadow: 0 0 20px rgba(0, 240, 255, 0.45); }
+}
+
+/* Apply radar ring animation */
+.radar-ring-animate {
+  animation: radarRing 3.5s ease-out infinite;
+}
+
+/* Button reset + global hover */
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+}
 button:not(:disabled):hover {
-  filter: brightness(1.15);
+  filter: brightness(1.12);
 }
 button:active {
   transform: scale(0.97);

@@ -1,47 +1,47 @@
 export const COLORS = {
-  // Backgrounds
-  BG_DEEP:         '#0B132B',   // Dark blue (like Game Over)
-  BG_GRID:         '#1C2541',
+  // Backgrounds — Deep Midnight Blue / Charcoal
+  BG_DEEP:         '#0B1325',
+  BG_GRID:         '#111D30',
   BG_PANEL:        '#0D1B2A',
 
   // Aircraft
-  AIRCRAFT_CIVIL:  '#00FF41',   // Neon Green — Cessna + Jetliner
-  AIRCRAFT_MILITARY:'#00B4D8',  // Neon Blue — Fighter
-  AIRCRAFT_HELI:   '#7FFF00',   // Chartreuse — Helicopter
-  AIRCRAFT_VIP:    '#FFD700',   // Gold — VIP
-  AIRCRAFT_EMERGENCY:'#FF003C', // Red — Emergency
+  AIRCRAFT_CIVIL:    '#39FF14',   // Razor Emerald — Cessna + Jetliner
+  AIRCRAFT_MILITARY: '#00F0FF',   // Electric Cyan — Fighter
+  AIRCRAFT_HELI:     '#7FFF00',   // Chartreuse — Helicopter
+  AIRCRAFT_VIP:      '#FFD700',   // Gold — VIP
+  AIRCRAFT_EMERGENCY:'#FF003C',   // Red — Emergency
 
   // UI Elements
   RUNWAY:          '#FFFFFF',
   HELIPAD:         '#FFFFFF',
-  RADAR_SWEEP:     'rgba(0, 255, 65, 0.12)',
-  RADAR_GRID:      'rgba(28, 37, 65, 0.6)',
+  RADAR_SWEEP:     'rgba(57, 255, 20, 0.10)',
+  RADAR_GRID:      'rgba(0, 240, 255, 0.08)',
 
   // Separation radius rings
-  RING_SAFE:       'rgba(0, 255, 65, 0.15)',
+  RING_SAFE:       'rgba(57, 255, 20, 0.14)',
   RING_WARNING:    'rgba(255, 165, 0, 0.4)',
   RING_DANGER:     'rgba(255, 0, 60, 0.6)',
 
   // Path drawing
-  PATH_ACTIVE:     'rgba(0, 255, 65, 0.8)',
-  PATH_PREVIEW:    'rgba(0, 255, 65, 0.3)',
+  PATH_ACTIVE:     'rgba(57, 255, 20, 0.85)',
+  PATH_PREVIEW:    'rgba(57, 255, 20, 0.28)',
 
-  // HUD
-  HUD_TEXT:        '#00FF41',
-  HUD_DIM:         'rgba(0, 255, 65, 0.5)',
-  HUD_ACCENT:      '#00B4D8',
+  // HUD — switched primary from retro-green to Electric Cyan
+  HUD_TEXT:        '#00F0FF',
+  HUD_DIM:         'rgba(0, 240, 255, 0.45)',
+  HUD_ACCENT:      '#39FF14',
   HUD_WARNING:     '#FFA500',
   HUD_DANGER:      '#FF003C',
   HUD_GOLD:        '#FFD700',
 
   // Fuel bar
-  FUEL_HIGH:       '#00FF41',
+  FUEL_HIGH:       '#39FF14',
   FUEL_MID:        '#FFA500',
   FUEL_LOW:        '#FF003C',
 
   // Combo
-  COMBO_1:         '#00FF41',
-  COMBO_2:         '#00B4D8',
+  COMBO_1:         '#39FF14',
+  COMBO_2:         '#00F0FF',
   COMBO_3:         '#FFA500',
   COMBO_MAX:       '#FFD700',
 
@@ -50,10 +50,10 @@ export const COLORS = {
   EVENT_TEXT:      '#FF003C',
 
   // Holding pattern
-  HOLDING_RING:    'rgba(0, 180, 216, 0.3)',
+  HOLDING_RING:    'rgba(0, 240, 255, 0.25)',
 
   // Scanline overlay (aesthetic)
-  SCANLINE:        'rgba(0, 0, 0, 0.03)',
+  SCANLINE:        'rgba(0, 0, 0, 0.025)',
 } as const;
 
 export type ColorKey = keyof typeof COLORS;

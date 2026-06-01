@@ -115,6 +115,63 @@ export function smoothPath(path: Vec2[], passes = 2): Vec2[] {
   return pts;
 }
 
+/**
+ * Finds the normalized progress (0–1) of the closest point on `path`
+ * that lies within a forward arc (±90°) of `acHeading`.
+ * If no forward point exists, returns 0 (start of path).
+ * Used to prevent aircraft from snapping backwards when a new path is drawn
+ * while the aircraft has already moved ahead of the drag-start point.
+ */
+export function findClosestForwardProgress(
+  path: Vec2[],
+  acPos: Vec2,
+  acHeading: number
+): number {
+  if (path.length < 2) return 0;
+  const total = pathLength(path);
+  if (total === 0) return 0;
+
+  const headingRad = headingToAngle(acHeading);
+  const fwdX = Math.cos(headingRad);
+  const fwdY = Math.sin(headingRad);
+
+  let bestProgress = -1;
+  let bestDist = Infinity;
+  let accumulated = 0;
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const A = path[i];
+    const B = path[i + 1];
+    const segLen = vecDist(A, B);
+    if (segLen === 0) { accumulated += segLen; continue; }
+
+    // Project acPos onto segment A→B, clamped to [0,1]
+    const dx = B.x - A.x;
+    const dy = B.y - A.y;
+    const t = Math.max(0, Math.min(1,
+      ((acPos.x - A.x) * dx + (acPos.y - A.y) * dy) / (segLen * segLen)
+    ));
+    const proj: Vec2 = { x: A.x + t * dx, y: A.y + t * dy };
+    const dist = vecDist(acPos, proj);
+
+    // Check if this projected point is in the forward hemisphere
+    const toProj: Vec2 = { x: proj.x - acPos.x, y: proj.y - acPos.y };
+    const projLen = vecLength(toProj);
+    const dot = projLen > 0
+      ? (toProj.x * fwdX + toProj.y * fwdY) / projLen
+      : 0;
+    const isForward = dot >= -0.1; // allow ±96° arc for smooth interception
+
+    if (isForward && dist < bestDist) {
+      bestDist = dist;
+      bestProgress = (accumulated + t * segLen) / total;
+    }
+    accumulated += segLen;
+  }
+
+  return bestProgress >= 0 ? bestProgress : 0;
+}
+
 // ── Holding Pattern ──────────────────────────────────────────
 
 /** Get position on a circular holding pattern */
