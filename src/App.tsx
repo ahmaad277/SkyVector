@@ -248,21 +248,14 @@ export default function App() {
         // the user was drawing, bridge from its current position to avoid a
         // large cross-track correction on the first simulation frame.
         const drawnPath = smoothPath(simplifyPath(path, 8));
-        const firstPoint = drawnPath[0];
-        const bridgeDistance = firstPoint
-          ? Math.hypot(firstPoint.x - a.position.x, firstPoint.y - a.position.y)
-          : 0;
-        const fullPath = firstPoint && bridgeDistance > a.speed * 0.75
-          ? [{ ...a.position }, ...drawnPath]
-          : drawnPath;
         // Find the closest forward point on the new path so the aircraft
         // merges onto it without reversing direction
-        const startProgress = fullPath.length >= 2
-          ? findClosestForwardProgress(fullPath, a.position, a.heading)
+        const startProgress = drawnPath.length >= 2
+          ? findClosestForwardProgress(drawnPath, a.position, a.heading)
           : 0;
         return {
           ...a,
-          path: fullPath,
+          path: drawnPath,
           pathProgress: startProgress,
           state: a.state === 'holding' ? 'flying' : a.state,
         };
