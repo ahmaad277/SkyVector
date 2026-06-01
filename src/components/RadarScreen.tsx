@@ -523,8 +523,8 @@ function drawAircraft(
     // Calculate allowed time based on distance to nearest runway
     let minDistance = Infinity;
     for (const runway of state.runways) {
-      const dx = ac.position.x - runway.x;
-      const dy = ac.position.y - runway.y;
+      const dx = ac.position.x - runway.position.x;
+      const dy = ac.position.y - runway.position.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < minDistance) minDistance = dist;
     }

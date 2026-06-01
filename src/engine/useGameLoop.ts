@@ -112,8 +112,8 @@ export function useGameLoop(options: UseGameLoopOptions) {
           // Calculate distance to nearest runway
           let minDistance = Infinity;
           for (const runway of newState.runways) {
-            const dx = a.position.x - runway.x;
-            const dy = a.position.y - runway.y;
+            const dx = a.position.x - runway.position.x;
+            const dy = a.position.y - runway.position.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < minDistance) minDistance = dist;
           }
