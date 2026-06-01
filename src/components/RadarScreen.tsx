@@ -500,17 +500,27 @@ function drawAircraft(
   ctx.rotate(-headingToAngle(ac.heading));
 
   // ── Callsign label ─────────────────────────────────────────
-  ctx.font = `bold 13px "Courier New", monospace`;
+  ctx.font = `bold 15px "Courier New", monospace`;
   ctx.fillStyle = color;
   ctx.textAlign = 'left';
-  ctx.fillText(ac.callsign, stats.size + 6, -stats.size + 2);
-  // Aircraft type sub-label
+  ctx.fillText(ac.callsign, stats.size + 7, -stats.size + 3);
+
+  // Aircraft type + target runway on second line
   const typeLabel: Record<string, string> = {
     cessna: 'C172', jetliner: 'B738', fighter: 'F-16', helicopter: 'HELO',
   };
-  ctx.font = `10px "Courier New", monospace`;
-  ctx.globalAlpha = 0.65;
-  ctx.fillText(typeLabel[ac.type] ?? ac.type.toUpperCase(), stats.size + 6, -stats.size + 16);
+  // Shorten runway id for display: "rwy-09L" → "09L", "hpad-01" → "H1"
+  const rwyShort = ac.targetRunwayId
+    ? ac.targetRunwayId.replace(/^rwy-/i, '').replace(/^hpad-/i, 'H').toUpperCase()
+    : '';
+  const subLine = rwyShort
+    ? `${typeLabel[ac.type] ?? ac.type.toUpperCase()} ▶${rwyShort}`
+    : (typeLabel[ac.type] ?? ac.type.toUpperCase());
+
+  ctx.font = `12px "Courier New", monospace`;
+  ctx.globalAlpha = 0.75;
+  ctx.fillStyle = rwyShort ? '#00F0FF' : color;
+  ctx.fillText(subLine, stats.size + 7, -stats.size + 18);
   ctx.globalAlpha = 1;
 
   // ── Fuel bar ───────────────────────────────────────────────
@@ -529,22 +539,28 @@ function drawAircraft(
       if (dist < minDistance) minDistance = dist;
     }
     
-    // Base 20s + up to 15s based on distance
-    const allowedTimeMs = 20000 + (Math.min(minDistance, 800) / 800) * 15000;
+    // Base 60s + up to 30s based on distance
+    const allowedTimeMs = 60000 + (Math.min(minDistance, 800) / 800) * 30000;
     const timeLeft = Math.max(0, Math.ceil((allowedTimeMs - timeInAir) / 1000));
     const timerText = `${timeLeft}s`;
 
     if (ac.isEmergency) {
       const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 200);
-      ctx.font = `bold ${12 + pulse * 2}px "Courier New"`;
-      ctx.fillStyle = `rgba(255,0,60,${0.85 + pulse * 0.15})`;
+      ctx.font = `bold ${15 + pulse * 2}px "Courier New"`;
+      ctx.fillStyle = `rgba(255,0,60,${0.9 + pulse * 0.1})`;
       ctx.textAlign = 'center';
-      ctx.fillText(`⚠ MAYDAY [${timerText}]`, 0, -stats.size - 14);
+      ctx.shadowColor = 'rgba(255,0,60,0.8)';
+      ctx.shadowBlur = 8;
+      ctx.fillText(`⚠ MAYDAY [${timerText}]`, 0, -stats.size - 16);
+      ctx.shadowBlur = 0;
     } else if (ac.isVIP) {
-      ctx.font = 'bold 12px "Courier New"';
+      ctx.font = 'bold 14px "Courier New"';
       ctx.fillStyle = COLORS.HUD_GOLD;
       ctx.textAlign = 'center';
-      ctx.fillText(`★ VIP [${timerText}]`, 0, -stats.size - 14);
+      ctx.shadowColor = 'rgba(255,215,0,0.7)';
+      ctx.shadowBlur = 6;
+      ctx.fillText(`★ VIP [${timerText}]`, 0, -stats.size - 16);
+      ctx.shadowBlur = 0;
     }
   }
 

@@ -118,8 +118,8 @@ export function useGameLoop(options: UseGameLoopOptions) {
             if (dist < minDistance) minDistance = dist;
           }
           
-          // Base time 20s + up to 15s extra based on distance (assuming max distance ~800)
-          const allowedTimeMs = 20000 + (Math.min(minDistance, 800) / 800) * 15000;
+          // Base time 60s + up to 30s extra based on distance from nearest runway
+          const allowedTimeMs = 60000 + (Math.min(minDistance, 800) / 800) * 30000;
           return (now - a.spawnTime > allowedTimeMs);
         }
         return false;

@@ -81,7 +81,7 @@ export function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway, now: n
 
     // Draw runway designator numbers at each threshold end (while still in rotated ctx)
     if (!closed) {
-      ctx.font = 'bold 11px "JetBrains Mono", "Courier New", monospace';
+      ctx.font = 'bold 13px "JetBrains Mono", "Courier New", monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
