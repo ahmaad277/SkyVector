@@ -269,14 +269,14 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 6,
   },
   lvlName: {
-    fontFamily: 'var(--font-ui)',
+    fontFamily: 'var(--font-mono)',
     fontSize: 15,
     fontWeight: 700,
     lineHeight: 1.2,
     marginBottom: 6,
   },
   lvlSub: {
-    fontFamily: 'var(--font-ui)',
+    fontFamily: 'var(--font-mono)',
     fontSize: 11,
     color: 'rgba(255,255,255,0.38)',
     lineHeight: 1.35,

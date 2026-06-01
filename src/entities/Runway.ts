@@ -71,7 +71,7 @@ export function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway, now: n
     // Helipad closed label in world space
     if (closed) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.font = 'bold 11px "Courier New", monospace';
+      ctx.font = 'bold 11px "JetBrains Mono","Courier New",monospace';
       ctx.fillStyle = 'rgba(255,0,60,0.9)';
       ctx.textAlign = 'center';
       ctx.fillText('CLOSED', position.x, position.y - width / 2 - 8);
@@ -145,7 +145,7 @@ export function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway, now: n
       ctx.textBaseline = 'alphabetic';
 
     } else {
-      ctx.font = 'bold 13px "Courier New", monospace';
+      ctx.font = 'bold 13px "JetBrains Mono","Courier New",monospace';
       ctx.fillStyle = 'rgba(255,0,60,0.9)';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -217,7 +217,7 @@ function drawHelipad(ctx: CanvasRenderingContext2D, size: number, closed: boolea
   ctx.stroke();
 
   // "H" letter
-  ctx.font = `bold ${size * 0.5}px "Courier New", monospace`;
+  ctx.font = `bold ${size * 0.5}px "JetBrains Mono","Courier New",monospace`;
   ctx.fillStyle = closed ? '#FF003C' : '#FFFFFF';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

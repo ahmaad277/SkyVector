@@ -388,7 +388,7 @@ function drawBirdStrikeZone(
   ctx.fillStyle = 'rgba(255, 165, 0, 0.07)';
   ctx.fill();
 
-  ctx.font = 'bold 11px "Courier New"';
+  ctx.font = 'bold 11px "JetBrains Mono","Courier New",monospace';
   ctx.fillStyle = 'rgba(255,165,0,0.9)';
   ctx.textAlign = 'center';
   ctx.fillText('BIRD STRIKE', zone.center.x, zone.center.y - zone.radius - 6);
@@ -500,7 +500,7 @@ function drawAircraft(
   ctx.rotate(-headingToAngle(ac.heading));
 
   // ── Callsign label (right of aircraft) ─────────────────────
-  ctx.font = `bold 16px "Courier New", monospace`;
+  ctx.font = `bold 16px "JetBrains Mono","Courier New",monospace`;
   ctx.fillStyle = color;
   ctx.textAlign = 'left';
   ctx.fillText(ac.callsign, stats.size + 8, -stats.size + 4);
@@ -530,7 +530,7 @@ function drawAircraft(
     }
 
     if (designator) {
-      ctx.font = `bold 14px "Courier New", monospace`;
+      ctx.font = `bold 14px "JetBrains Mono","Courier New",monospace`;
       ctx.fillStyle = '#00F0FF';
       ctx.textAlign = 'center';
       ctx.shadowColor = 'rgba(0,240,255,0.65)';
@@ -563,7 +563,7 @@ function drawAircraft(
 
     if (ac.isEmergency) {
       const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 200);
-      ctx.font = `bold ${15 + pulse * 2}px "Courier New"`;
+      ctx.font = `bold ${15 + pulse * 2}px "JetBrains Mono","Courier New",monospace`;
       ctx.fillStyle = `rgba(255,0,60,${0.9 + pulse * 0.1})`;
       ctx.textAlign = 'center';
       ctx.shadowColor = 'rgba(255,0,60,0.8)';
@@ -571,7 +571,7 @@ function drawAircraft(
       ctx.fillText(`⚠ MAYDAY [${timerText}]`, 0, -stats.size - 16);
       ctx.shadowBlur = 0;
     } else if (ac.isVIP) {
-      ctx.font = 'bold 14px "Courier New"';
+      ctx.font = 'bold 14px "JetBrains Mono","Courier New",monospace';
       ctx.fillStyle = COLORS.HUD_GOLD;
       ctx.textAlign = 'center';
       ctx.shadowColor = 'rgba(255,215,0,0.7)';

@@ -203,7 +203,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 2,
   },
   tagline: {
-    fontFamily: 'var(--font-ui)',
+    fontFamily: 'var(--font-mono)',
     fontSize: 12,
     fontWeight: 400,
     color: 'rgba(255,255,255,0.35)',

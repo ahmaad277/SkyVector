@@ -229,7 +229,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '6px 10px',
     background: 'linear-gradient(to bottom, rgba(11,19,43,0.9) 0%, rgba(11,19,43,0) 100%)',
     borderBottom: 'none',
-    fontFamily: '"Courier New", monospace',
+    fontFamily: 'var(--font-mono)',
     userSelect: 'none',
     pointerEvents: 'none', // let clicks pass through the background
   },
