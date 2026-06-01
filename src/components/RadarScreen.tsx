@@ -3,7 +3,7 @@ import type { GameState, Aircraft, Runway, Vec2 } from '../types/game.types';
 import { COLORS, getAircraftColor, getFuelColor, getRingColor } from '../utils/colorPalette';
 import { drawRunway, isOnRunway } from '../entities/Runway';
 import { isSeparationViolated } from '../entities/Aircraft';
-import { canvasPoint, simplifyPath, smoothPath, vecDist, headingToAngle } from '../utils/pathMath';
+import { canvasPoint, vecDist, headingToAngle } from '../utils/pathMath';
 import { AIRCRAFT_STATS } from '../entities/Aircraft';
 import { LEVELS } from '../levels';
 
@@ -127,8 +127,7 @@ export default function RadarScreen({
     if (!drawingRef.current.active || !drawingRef.current.aircraftId) return;
     const raw = drawingRef.current.points;
     if (raw.length > 2) {
-      const path = smoothPath(simplifyPath(raw, 8));
-      onPathDrawn(drawingRef.current.aircraftId, path);
+      onPathDrawn(drawingRef.current.aircraftId, raw);
     }
     drawingRef.current = { active: false, points: [], aircraftId: null };
     gameStateRef.current = { ...gameStateRef.current, drawingPath: [], isDrawing: false };
@@ -174,8 +173,7 @@ export default function RadarScreen({
     if (!drawingRef.current.active || !drawingRef.current.aircraftId) return;
     const raw = drawingRef.current.points;
     if (raw.length > 2) {
-      const path = smoothPath(simplifyPath(raw, 8));
-      onPathDrawn(drawingRef.current.aircraftId, path);
+      onPathDrawn(drawingRef.current.aircraftId, raw);
     }
     drawingRef.current = { active: false, points: [], aircraftId: null };
     gameStateRef.current = { ...gameStateRef.current, drawingPath: [], isDrawing: false };
@@ -259,7 +257,8 @@ export function renderFrame(state: GameState, canvas: HTMLCanvasElement): void {
           isOnRunway(lastPoint, runway, state.windDirection, state.windStrength)
         );
       }
-      drawFlightPath(ctx, ac, state.selectedAircraftId === ac.id, isConnected);
+      const { alpha, colorOverride } = getPhosphorState(ac, state, W, H);
+      drawFlightPath(ctx, ac, state.selectedAircraftId === ac.id, isConnected, alpha, colorOverride);
     }
   }
 
@@ -279,8 +278,8 @@ export function renderFrame(state: GameState, canvas: HTMLCanvasElement): void {
   // ── Aircraft ──────────────────────────────────────────────
   for (const ac of state.aircraft) {
     if (ac.state === 'landed') continue;
-    const visible = isVisible(ac, state, W, H);
-    drawAircraft(ctx, ac, state, visible);
+    const { alpha, colorOverride } = getPhosphorState(ac, state, W, H);
+    drawAircraft(ctx, ac, state, alpha, colorOverride);
   }
 
   // ── Scanlines overlay (CRT aesthetic) ────────────────────
@@ -329,27 +328,21 @@ function drawRadarSweep(ctx: CanvasRenderingContext2D, W: number, H: number, ang
   ctx.arc(cx, cy, maxR, angleRad - spread, angleRad);
   ctx.closePath();
   const sweepGrad = ctx.createLinearGradient(cx, cy, cx + Math.cos(angleRad) * maxR, cy + Math.sin(angleRad) * maxR);
-  sweepGrad.addColorStop(0, 'rgba(49, 130, 206, 0.0)');
-  sweepGrad.addColorStop(0.6, 'rgba(49, 130, 206, 0.08)');
-  sweepGrad.addColorStop(1, 'rgba(49, 130, 206, 0.22)');
+  sweepGrad.addColorStop(0, 'rgba(57, 255, 20, 0.0)');
+  sweepGrad.addColorStop(0.6, 'rgba(57, 255, 20, 0.08)');
+  sweepGrad.addColorStop(1, 'rgba(57, 255, 20, 0.3)');
   ctx.fillStyle = sweepGrad;
   ctx.fill();
   ctx.restore();
 
   // Leading edge line
   ctx.save();
-  ctx.strokeStyle = 'rgba(49, 130, 206, 0.7)';
+  ctx.strokeStyle = 'rgba(57, 255, 20, 0.8)';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(cx, cy);
   ctx.lineTo(cx + Math.cos(angleRad) * maxR, cy + Math.sin(angleRad) * maxR);
   ctx.stroke();
-  ctx.restore();
-
-  // IFR darkness overlay (hide aircraft not near sweep)
-  ctx.save();
-  ctx.fillStyle = 'rgba(226,232,240,0.85)';
-  ctx.fillRect(0, 0, W, H);
   ctx.restore();
 }
 
@@ -394,10 +387,11 @@ function drawBirdStrikeZone(
 }
 
 // ── Flight path ───────────────────────────────────────────────
-function drawFlightPath(ctx: CanvasRenderingContext2D, ac: Aircraft, selected: boolean, isConnected: boolean) {
-  if (ac.path.length < 2) return;
+function drawFlightPath(ctx: CanvasRenderingContext2D, ac: Aircraft, selected: boolean, isConnected: boolean, alpha: number, colorOverride: string | null) {
+  if (ac.path.length < 2 || alpha <= 0) return;
   ctx.save();
-  ctx.strokeStyle = isConnected ? '#00B4D8' : (selected ? COLORS.PATH_ACTIVE : COLORS.PATH_PREVIEW);
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = colorOverride || (isConnected ? '#00B4D8' : (selected ? COLORS.PATH_ACTIVE : COLORS.PATH_PREVIEW));
   ctx.lineWidth = selected ? 2 : 1.5;
   ctx.setLineDash([6, 4]);
   ctx.beginPath();
@@ -416,7 +410,7 @@ function drawFlightPath(ctx: CanvasRenderingContext2D, ac: Aircraft, selected: b
   const last = ac.path[ac.path.length - 1];
   ctx.beginPath();
   ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
-  ctx.fillStyle = isConnected ? '#00B4D8' : (selected ? COLORS.PATH_ACTIVE : COLORS.PATH_PREVIEW);
+  ctx.fillStyle = colorOverride || (isConnected ? '#00B4D8' : (selected ? COLORS.PATH_ACTIVE : COLORS.PATH_PREVIEW));
   ctx.fill();
   ctx.restore();
 }
@@ -446,15 +440,29 @@ function getAcceptingAirportRunways(state: GameState, ac: Aircraft): Runway[] {
 }
 
 // ── Aircraft visibility (IFR mode) ───────────────────────────
-function isVisible(ac: Aircraft, state: GameState, W: number, H: number): boolean {
+function getPhosphorState(ac: Aircraft, state: GameState, W: number, H: number): { alpha: number, colorOverride: string | null } {
   const config = LEVELS[state.level - 1] ?? LEVELS[0];
-  if (!config.hasRadarSweep) return true;
+  if (!config.hasRadarSweep) return { alpha: 1, colorOverride: null };
+
   const cx = W / 2, cy = H / 2;
   const sweepAngle = (state.radarAngle * Math.PI) / 180;
-  const spread = (30 * Math.PI) / 180;
   const acAngle = Math.atan2(ac.position.y - cy, ac.position.x - cx);
-  const diff = Math.abs(((acAngle - sweepAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-  return diff < spread;
+  
+  // How many radians ago did the sweep pass the aircraft?
+  let diff = sweepAngle - acAngle;
+  while (diff < 0) diff += Math.PI * 2;
+  while (diff >= Math.PI * 2) diff -= Math.PI * 2;
+
+  const diffDeg = (diff * 180) / Math.PI;
+
+  if (diffDeg <= 40) {
+    return { alpha: 1.0, colorOverride: '#39FF14' };
+  } else if (diffDeg <= 320) {
+    const t = 1 - (diffDeg - 40) / 280;
+    return { alpha: t, colorOverride: '#FFFFFF' };
+  } else {
+    return { alpha: 0, colorOverride: null };
+  }
 }
 
 // ── Aircraft drawing ──────────────────────────────────────────
@@ -462,12 +470,13 @@ function drawAircraft(
   ctx: CanvasRenderingContext2D,
   ac: Aircraft,
   state: GameState,
-  visible: boolean
+  alpha: number,
+  colorOverride: string | null
 ) {
+  if (alpha <= 0) return;
   const stats = AIRCRAFT_STATS[ac.type];
-  const color = getAircraftColor(ac.type, ac.isEmergency, ac.isVIP);
+  const color = colorOverride || getAircraftColor(ac.type, ac.isEmergency, ac.isVIP);
   const selected = state.selectedAircraftId === ac.id;
-  const alpha = visible ? 1 : 0.15;
 
   // Check separation warnings
   const otherAircraft = state.aircraft.filter((o) => o.id !== ac.id && o.state !== 'landed' && o.state !== 'crashed');
@@ -518,16 +527,16 @@ function drawAircraft(
     const airportCode = config.airport.id === ac.targetAirportId ? config.airport.icao : ac.targetAirportId.toUpperCase();
 
     ctx.font = `bold 14px "JetBrains Mono","Courier New",monospace`;
-    ctx.fillStyle = '#00F0FF';
+    ctx.fillStyle = colorOverride || '#00F0FF';
     ctx.textAlign = 'center';
-    ctx.shadowColor = 'rgba(0,240,255,0.65)';
+    ctx.shadowColor = colorOverride ? 'rgba(255,255,255,0.65)' : 'rgba(0,240,255,0.65)';
     ctx.shadowBlur = 5;
     ctx.fillText(airportCode, 0, stats.size + 18);
     ctx.shadowBlur = 0;
   }
 
   // ── Fuel bar ───────────────────────────────────────────────
-  drawFuelBar(ctx, ac, stats.size);
+  drawFuelBar(ctx, ac, stats.size, colorOverride);
 
   // ── Emergency / VIP badge ──────────────────────────────────
   if (ac.isEmergency || ac.isVIP) {
@@ -550,17 +559,17 @@ function drawAircraft(
     if (ac.isEmergency) {
       const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 200);
       ctx.font = `bold ${15 + pulse * 2}px "JetBrains Mono","Courier New",monospace`;
-      ctx.fillStyle = `rgba(255,0,60,${0.9 + pulse * 0.1})`;
+      ctx.fillStyle = colorOverride || `rgba(255,0,60,${0.9 + pulse * 0.1})`;
       ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(255,0,60,0.8)';
+      ctx.shadowColor = colorOverride ? 'rgba(255,255,255,0.65)' : 'rgba(255,0,60,0.8)';
       ctx.shadowBlur = 8;
       ctx.fillText(`⚠ MAYDAY [${timerText}]`, 0, -stats.size - 16);
       ctx.shadowBlur = 0;
     } else if (ac.isVIP) {
       ctx.font = 'bold 14px "JetBrains Mono","Courier New",monospace';
-      ctx.fillStyle = COLORS.HUD_GOLD;
+      ctx.fillStyle = colorOverride || COLORS.HUD_GOLD;
       ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(255,215,0,0.7)';
+      ctx.shadowColor = colorOverride ? 'rgba(255,255,255,0.65)' : 'rgba(255,215,0,0.7)';
       ctx.shadowBlur = 6;
       ctx.fillText(`★ VIP [${timerText}]`, 0, -stats.size - 16);
       ctx.shadowBlur = 0;
@@ -820,7 +829,7 @@ function drawAircraftShape(
   }
 }
 
-function drawFuelBar(ctx: CanvasRenderingContext2D, ac: Aircraft, size: number) {
+function drawFuelBar(ctx: CanvasRenderingContext2D, ac: Aircraft, size: number, colorOverride: string | null) {
   const barW = size * 2.2;
   const barH = 3;
   const bx = -barW / 2;
@@ -832,13 +841,13 @@ function drawFuelBar(ctx: CanvasRenderingContext2D, ac: Aircraft, size: number) 
   ctx.fillRect(bx, by, barW, barH);
 
   // Fill
-  ctx.fillStyle = getFuelColor(ac.fuel);
+  ctx.fillStyle = colorOverride || getFuelColor(ac.fuel);
   ctx.fillRect(bx, by, barW * fuelPct, barH);
 
   // Pulsing low-fuel warning
   if (ac.fuel <= 20) {
     const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 150);
-    ctx.strokeStyle = `rgba(255,0,60,${pulse})`;
+    ctx.strokeStyle = colorOverride || `rgba(255,0,60,${pulse})`;
     ctx.lineWidth = 1;
     ctx.strokeRect(bx, by, barW, barH);
   }

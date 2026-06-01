@@ -5,7 +5,7 @@ interface MainMenuProps {
   onContinue: () => void;
   onNewGame: () => void;
   onLeaderboard: () => void;
-  onSettings: () => void;
+  onUnlockAllStages: () => void;
   highScore: number;
   canContinue: boolean;
 }
@@ -14,17 +14,31 @@ export default function MainMenu({
   onContinue,
   onNewGame,
   onLeaderboard,
-  onSettings,
+  onUnlockAllStages,
   highScore,
   canContinue,
 }: MainMenuProps) {
   const [hoveredBtn, setHoveredBtn] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [password, setPassword] = useState('');
+  const [settingsMessage, setSettingsMessage] = useState('');
+
+  const handleUnlockSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password.trim() === 'احمد') {
+      onUnlockAllStages();
+      setSettingsMessage('ALL STAGES UNLOCKED');
+      setPassword('');
+      return;
+    }
+    setSettingsMessage('INVALID PASSWORD');
+  };
 
   const buttons = [
     { id: 'continue',    label: 'CONTINUE',    action: onContinue,    disabled: !canContinue },
     { id: 'newgame',     label: 'NEW GAME',     action: onNewGame,     disabled: false },
     { id: 'leaderboard', label: 'LEADERBOARD',  action: onLeaderboard, disabled: false },
-    { id: 'settings',    label: 'SETTINGS',     action: onSettings,    disabled: false },
+    { id: 'settings',    label: 'SETTINGS',     action: () => setSettingsOpen(true), disabled: false },
   ];
 
   return (
@@ -102,6 +116,42 @@ export default function MainMenu({
 
         <div style={styles.version}>v1.0 · SKYVECTOR</div>
       </div>
+
+      {settingsOpen && (
+        <div style={styles.modalBackdrop}>
+          <form style={styles.settingsModal} onSubmit={handleUnlockSubmit}>
+            <div style={styles.settingsTitle}>SETTINGS</div>
+            <div style={styles.settingsText}>ENTER ADMIN PASSWORD TO UNLOCK ALL STAGES</div>
+            <input
+              style={styles.passwordInput}
+              type="password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setSettingsMessage('');
+              }}
+              placeholder="PASSWORD"
+              autoFocus
+            />
+            {settingsMessage && (
+              <div style={{
+                ...styles.settingsMessage,
+                color: settingsMessage.includes('UNLOCKED') ? '#39FF14' : '#FF003C',
+              }}>
+                {settingsMessage}
+              </div>
+            )}
+            <div style={styles.settingsActions}>
+              <button type="button" style={styles.secondaryBtn} onClick={() => setSettingsOpen(false)}>
+                CLOSE
+              </button>
+              <button type="submit" style={styles.primaryBtn}>
+                UNLOCK
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
@@ -299,5 +349,94 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 10,
     color: 'rgba(255,255,255,0.18)',
     letterSpacing: 1,
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    inset: 0,
+    zIndex: 5,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    background: 'rgba(0,0,0,0.55)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+  },
+  settingsModal: {
+    width: 'min(360px, 92vw)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    padding: 22,
+    background: 'rgba(13, 27, 42, 0.94)',
+    border: '1px solid rgba(0,240,255,0.28)',
+    borderRadius: 16,
+    boxShadow: '0 18px 50px rgba(0,0,0,0.65), 0 0 24px rgba(0,240,255,0.12)',
+  },
+  settingsTitle: {
+    fontFamily: 'var(--font-title)',
+    fontSize: 18,
+    fontWeight: 800,
+    letterSpacing: 3,
+    color: '#00F0FF',
+    textAlign: 'center',
+  },
+  settingsText: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    letterSpacing: 1,
+    lineHeight: 1.4,
+    color: 'rgba(255,255,255,0.45)',
+    textAlign: 'center',
+  },
+  passwordInput: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 16,
+    color: '#FFFFFF',
+    background: 'rgba(0,240,255,0.06)',
+    border: '1px solid rgba(0,240,255,0.28)',
+    borderRadius: 10,
+    outline: 'none',
+    padding: '12px 14px',
+    textAlign: 'center',
+  },
+  settingsMessage: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: 1.5,
+    textAlign: 'center',
+    minHeight: 14,
+  },
+  settingsActions: {
+    display: 'flex',
+    gap: 10,
+  },
+  secondaryBtn: {
+    flex: 1,
+    fontFamily: 'var(--font-title)',
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: 2,
+    color: 'rgba(255,255,255,0.62)',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.14)',
+    borderRadius: 10,
+    padding: '12px 10px',
+    cursor: 'pointer',
+  },
+  primaryBtn: {
+    flex: 1,
+    fontFamily: 'var(--font-title)',
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: 2,
+    color: '#06121D',
+    background: '#00F0FF',
+    border: '1px solid rgba(0,240,255,0.8)',
+    borderRadius: 10,
+    padding: '12px 10px',
+    cursor: 'pointer',
+    boxShadow: '0 0 18px rgba(0,240,255,0.35)',
   },
 };

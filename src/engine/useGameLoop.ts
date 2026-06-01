@@ -70,9 +70,10 @@ export function useGameLoop(options: UseGameLoopOptions) {
       const config: LevelConfig = LEVELS[state.level - 1] ?? LEVELS[0];
 
       // ── 1. Radar sweep ────────────────────────────────────
+      const radarSpeed = config.hasRadarSweep ? 240 : 45;
       let newState: GameState = {
         ...state,
-        radarAngle: (state.radarAngle + 45 * dt) % 360,
+        radarAngle: (state.radarAngle + radarSpeed * dt) % 360,
       };
 
       // ── 2. Spawn new aircraft ─────────────────────────────

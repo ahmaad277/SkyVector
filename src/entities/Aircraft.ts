@@ -264,9 +264,16 @@ function updateFollowPath(
   };
   const k = crossTrackK[ac.type] ?? 2.0;
   const pathRef = pointAlongPath(ac.path, newTravelled);
+  const errorX = pathRef.x - integratedPos.x;
+  const errorY = pathRef.y - integratedPos.y;
+  const errorLen = Math.sqrt(errorX * errorX + errorY * errorY);
+  const desiredCorrection = Math.min(errorLen, errorLen * k * dt);
+  const maxCorrection = ac.speed * 0.35 * dt;
+  const correctionLen = Math.min(desiredCorrection, maxCorrection);
+  const correctionScale = errorLen > 0 ? correctionLen / errorLen : 0;
   const correctedPos = {
-    x: integratedPos.x + (pathRef.x - integratedPos.x) * k * dt,
-    y: integratedPos.y + (pathRef.y - integratedPos.y) * k * dt,
+    x: integratedPos.x + errorX * correctionScale,
+    y: integratedPos.y + errorY * correctionScale,
   };
 
   return {
