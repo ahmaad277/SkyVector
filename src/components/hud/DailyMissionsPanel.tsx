@@ -32,26 +32,26 @@ export default function DailyMissionsPanel({ missions }: DailyMissionsPanelProps
     prevMissionsRef.current = missions;
   }, [missions]);
 
+  if (!missions || missions.length === 0) return null;
+
   return (
     <>
       <div style={{
         position: 'fixed',
         bottom: 10,
         right: 10, // Moved to bottom right
-        width: 280,
+        width: 220,
         background: 'rgba(11, 19, 43, 0.85)',
         border: '1px solid rgba(0, 240, 255, 0.2)',
         borderRadius: 6,
         padding: '8px 12px',
         pointerEvents: 'auto',
-        maxHeight: 120,
-        overflowY: 'auto',
         zIndex: 50,
       }}>
         <div style={{ fontSize: 10, color: '#00F0FF', fontWeight: 'bold', marginBottom: 6, letterSpacing: 1 }}>
-          DAILY MISSIONS
+          ACTIVE MISSION
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {missions.map(m => (
             <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <div style={{ fontSize: 9, color: m.completed ? '#39FF14' : 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={m.description}>

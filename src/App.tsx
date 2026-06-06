@@ -57,6 +57,8 @@ export default function App() {
     return () => window.removeEventListener('settings_changed', handleSettingsChanged);
   }, []);
 
+  const [activeMissionId, setActiveMissionId] = useState<string | null>(null);
+
   // ── Mutable game state (no re-renders during game loop) ──
   const gameStateRef = useRef<GameState>(createInitialGameState(1));
   const maxComboRef = useRef(1);
@@ -194,6 +196,16 @@ export default function App() {
       setGameOverData(prev => ({ ...prev, level: nextLevel }));
       gameStateRef.current = createInitialGameState(nextLevel);
       gameStateRef.current.score = carriedScore;
+      
+      // Pick a random uncompleted mission for this new level
+      const uncompletedMissions = missions.filter(m => !m.completed);
+      if (uncompletedMissions.length > 0) {
+        const randomMission = uncompletedMissions[Math.floor(Math.random() * uncompletedMissions.length)];
+        setActiveMissionId(randomMission.id);
+      } else {
+        setActiveMissionId(null);
+      }
+
       setScore(carriedScore);
       setCurrentLevel(nextLevel);
       setLives(3);
@@ -205,7 +217,7 @@ export default function App() {
     } else {
       setScreen('menu');
     }
-  }, []);
+  }, [missions]);
 
   const handleEventTriggered = useCallback(
     (event: GameState['activeEvent']) => {
@@ -329,6 +341,15 @@ export default function App() {
     gameStateRef.current.windStrength = config.windStrength;
     gameStateRef.current.altitudeEnabled = true;
     
+    // Pick a random uncompleted mission for survival
+    const uncompletedMissions = missions.filter(m => !m.completed);
+    if (uncompletedMissions.length > 0) {
+      const randomMission = uncompletedMissions[Math.floor(Math.random() * uncompletedMissions.length)];
+      setActiveMissionId(randomMission.id);
+    } else {
+      setActiveMissionId(null);
+    }
+
     maxComboRef.current = 1;
     setScore(0);
     setCurrentLevel(1);
@@ -340,7 +361,7 @@ export default function App() {
     setSessionStart(Date.now());
     setScreen('game');
     setTimeout(() => gameLoopRef.current?.start(), 50);
-  }, []);
+  }, [missions]);
 
   const handleSurvivalRoundNext = useCallback((powerUp: PowerUp) => {
     const state = gameStateRef.current;
@@ -373,9 +394,18 @@ export default function App() {
       altitudeEnabled: true,
     };
     
+    // Pick a random uncompleted mission for this new survival round
+    const uncompletedMissions = missions.filter(m => !m.completed);
+    if (uncompletedMissions.length > 0) {
+      const randomMission = uncompletedMissions[Math.floor(Math.random() * uncompletedMissions.length)];
+      setActiveMissionId(randomMission.id);
+    } else {
+      setActiveMissionId(null);
+    }
+    
     setScreen('game');
     setTimeout(() => gameLoopRef.current?.start(), 50);
-  }, []);
+  }, [missions]);
 
   const handleStartLevel = useCallback(
     (level: number, isMultiplayer = false) => {
@@ -390,6 +420,15 @@ export default function App() {
         gameStateRef.current.altitudeEnabled = true;
       }
       
+      // Pick a random uncompleted mission for this level
+      const uncompletedMissions = missions.filter(m => !m.completed);
+      if (uncompletedMissions.length > 0) {
+        const randomMission = uncompletedMissions[Math.floor(Math.random() * uncompletedMissions.length)];
+        setActiveMissionId(randomMission.id);
+      } else {
+        setActiveMissionId(null);
+      }
+
       maxComboRef.current = 1;
       setScore(0);
       setCurrentLevel(level);
@@ -403,7 +442,7 @@ export default function App() {
       setScreen('game');
       setTimeout(() => gameLoopRef.current?.start(), 50);
     },
-    [multiplayer, profile.id]
+    [multiplayer, profile.id, missions]
   );
 
   const handleContinue = useCallback(() => {
@@ -592,6 +631,8 @@ export default function App() {
     }
   }, [multiplayer.room, screen, handleStartLevel]);
 
+  const activeMission = missions.find(m => m.id === activeMissionId);
+
   // ── Render ────────────────────────────────────────────────
   return (
     <div style={appStyles.root} className={`theme-${bgTheme}`}>
@@ -610,7 +651,7 @@ export default function App() {
           {gameStateRef.current.survivalState ? (
             <SurvivalHUD
               survivalState={gameStateRef.current.survivalState}
-              missions={missions}
+              missions={activeMission ? [activeMission] : []}
               onPause={handlePause}
             />
           ) : (
@@ -624,7 +665,7 @@ export default function App() {
               activeEvent={activeEvent}
               aircraftCount={aircraftCount}
               lives={lives}
-              missions={missions}
+              missions={activeMission ? [activeMission] : []}
               onPause={handlePause}
             />
           )}
