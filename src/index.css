@@ -111,3 +111,23 @@ canvas {
   user-select: none;
   -webkit-user-select: none;
 }
+
+/* ── Background Themes ──────────────────────────────────── */
+.theme-classic {
+  background: var(--color-bg);
+}
+.theme-satellite {
+  background: radial-gradient(circle at 50% 50%, #0f2819 0%, #0a1c15 100%);
+}
+.theme-tactical {
+  background: #050a0f;
+  background-image: linear-gradient(rgba(0, 255, 100, 0.05) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(0, 255, 100, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.theme-night_ops {
+  background: #020205;
+}
+.theme-amber_crt {
+  background: #1a0a00;
+}

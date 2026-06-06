@@ -66,13 +66,26 @@ export function useSupabase() {
   useEffect(() => {
     (async () => {
       if (isSupabaseReady) {
-        const user = await getCurrentUser();
-        if (!user) await signInAnonymously();
+        let user = await getCurrentUser();
+        if (!user) {
+          const id = await signInAnonymously();
+          if (id) {
+            user = { id } as any;
+          }
+        }
+        
+        if (user) {
+          setProfile(prev => {
+            const updated = { ...prev, id: user.id };
+            saveLocalProfile(updated);
+            return updated;
+          });
+        }
       }
       const missions = await getDailyMissions(profile.id);
       setMissions(missions);
     })();
-  }, [profile.id]);
+  }, []);
 
   // ── Add XP + rank up ────────────────────────────────────────
   const addXP = useCallback((xp: number) => {

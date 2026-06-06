@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import type { SurvivalState } from '../types/survival.types';
 import type { DailyMission } from '../types/game.types';
 import { POWER_UPS } from '../engine/SurvivalEngine';
+import DailyMissionsPanel from './hud/DailyMissionsPanel';
+import GameTopBar from './hud/GameTopBar';
 
 interface SurvivalHUDProps {
   survivalState: SurvivalState;
@@ -17,57 +19,13 @@ export default function SurvivalHUD({ survivalState, missions, onPause }: Surviv
     return () => clearInterval(id);
   }, []);
 
-  const elapsed = now - survivalState.roundStartTime;
-  const remaining = Math.max(0, survivalState.roundTimerMs - elapsed);
-  const seconds = Math.ceil(remaining / 1000);
-
-  const healthPercent = (survivalState.health / 10) * 100;
-  const isLowHealth = survivalState.health <= 3;
-
   return (
     <div style={styles.root}>
       {/* Top Bar */}
-      <div style={styles.topBar}>
-        <div style={styles.leftGroup}>
-          <div style={styles.roundBox}>
-            <div style={styles.label}>ROUND</div>
-            <div style={styles.value}>{survivalState.round}</div>
-          </div>
-          
-          <div style={styles.healthBox}>
-            <div style={styles.label}>HULL INTEGRITY</div>
-            <div style={styles.healthBarBg}>
-              <div style={{
-                ...styles.healthBarFill,
-                width: `${healthPercent}%`,
-                background: isLowHealth ? '#FF003C' : '#39FF14',
-                animation: isLowHealth ? 'pulse 1s infinite' : 'none',
-              }} />
-            </div>
-          </div>
-        </div>
-
-        <div style={styles.centerGroup}>
-          <div style={{
-            ...styles.timerBox,
-            color: seconds <= 10 ? '#FF003C' : '#FFF',
-            animation: seconds <= 10 ? 'pulse 1s infinite' : 'none',
-          }}>
-            {seconds}s
-          </div>
-          <div style={styles.quotaBox}>
-            QUOTA: {survivalState.roundLandings} / {survivalState.roundLandingTarget}
-          </div>
-        </div>
-
-        <div style={styles.rightGroup}>
-          <div style={styles.scoreBox}>
-            <div style={styles.label}>SCORE</div>
-            <div style={styles.value}>{survivalState.totalScore.toLocaleString()}</div>
-          </div>
-          <button style={styles.pauseBtn} onClick={onPause}>⏸</button>
-        </div>
-      </div>
+      <GameTopBar
+        onPause={onPause}
+        survivalState={survivalState}
+      />
 
       {/* Active Buffs */}
       {survivalState.activeBuffs.length > 0 && (
@@ -102,35 +60,7 @@ export default function SurvivalHUD({ survivalState, missions, onPause }: Surviv
       )}
 
       {/* Daily Missions Panel */}
-      <div style={{
-        position: 'absolute',
-        bottom: 10,
-        left: 10,
-        width: 280,
-        background: 'rgba(11, 19, 43, 0.85)',
-        border: '1px solid rgba(0, 240, 255, 0.2)',
-        borderRadius: 6,
-        padding: '8px 12px',
-        pointerEvents: 'auto',
-        maxHeight: 120,
-        overflowY: 'auto',
-      }}>
-        <div style={{ fontSize: 10, color: '#00F0FF', fontWeight: 'bold', marginBottom: 6, letterSpacing: 1 }}>
-          DAILY MISSIONS
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
-          {missions.map(m => (
-            <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <div style={{ fontSize: 9, color: m.completed ? '#39FF14' : 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={m.description}>
-                {m.completed ? '✓ ' : ''}{m.description}
-              </div>
-              <div style={{ height: 3, background: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
-                <div style={{ height: '100%', background: m.completed ? '#39FF14' : '#00F0FF', width: `${Math.min(100, (m.current / m.target) * 100)}%`, borderRadius: 2 }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <DailyMissionsPanel missions={missions} />
     </div>
   );
 }
@@ -138,115 +68,8 @@ export default function SurvivalHUD({ survivalState, missions, onPause }: Surviv
 const styles: Record<string, React.CSSProperties> = {
   root: {
     width: '100%',
-    padding: '12px 16px',
+    padding: '6px 10px',
     pointerEvents: 'none',
-  },
-  topBar: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 16,
-  },
-  leftGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-    flex: 1,
-  },
-  centerGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 4,
-    flex: 1,
-  },
-  rightGroup: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'flex-end',
-    gap: 12,
-    flex: 1,
-  },
-  roundBox: {
-    background: 'rgba(13, 27, 42, 0.8)',
-    border: '1px solid rgba(255,0,60,0.4)',
-    borderRadius: 6,
-    padding: '6px 12px',
-    display: 'inline-flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-  },
-  label: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 9,
-    color: 'rgba(255,255,255,0.5)',
-    letterSpacing: 1,
-  },
-  value: {
-    fontFamily: 'var(--font-title)',
-    fontSize: 18,
-    color: '#FF003C',
-    fontWeight: 800,
-  },
-  healthBox: {
-    background: 'rgba(13, 27, 42, 0.8)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 6,
-    padding: '6px 12px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-    width: 140,
-  },
-  healthBarBg: {
-    width: '100%',
-    height: 6,
-    background: 'rgba(0,0,0,0.5)',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  healthBarFill: {
-    height: '100%',
-    transition: 'width 0.3s ease, background-color 0.3s ease',
-  },
-  timerBox: {
-    fontFamily: 'var(--font-title)',
-    fontSize: 28,
-    fontWeight: 900,
-    textShadow: '0 0 10px rgba(0,0,0,0.8)',
-    letterSpacing: 2,
-  },
-  quotaBox: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 11,
-    color: '#FFF',
-    background: 'rgba(0,0,0,0.6)',
-    padding: '4px 10px',
-    borderRadius: 10,
-    border: '1px solid rgba(255,255,255,0.2)',
-  },
-  scoreBox: {
-    background: 'rgba(13, 27, 42, 0.8)',
-    border: '1px solid rgba(0,240,255,0.3)',
-    borderRadius: 6,
-    padding: '6px 12px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-  },
-  pauseBtn: {
-    pointerEvents: 'auto',
-    background: 'rgba(13, 27, 42, 0.8)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    color: '#FFF',
-    borderRadius: 6,
-    width: 36,
-    height: 36,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    fontSize: 16,
   },
   buffsContainer: {
     position: 'absolute',

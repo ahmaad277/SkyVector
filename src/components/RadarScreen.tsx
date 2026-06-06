@@ -7,6 +7,9 @@ import { canvasPoint, vecDist, headingToAngle } from '../utils/pathMath';
 import { AIRCRAFT_STATS } from '../entities/Aircraft';
 import { LEVELS } from '../levels';
 
+import { getSurvivalLevelConfig } from '../engine/SurvivalEngine';
+import { getBackgroundTheme, drawBackground } from '../utils/backgroundThemes';
+
 // ── Logical canvas size (all positions in GDD use this) ──────
 const LOGICAL_W = 800;
 
@@ -16,6 +19,7 @@ interface RadarScreenProps {
   onAircraftSelected: (id: string | null) => void;
   onHoldingToggle: (aircraftId: string) => void;
   onAltitudeChange: (aircraftId: string, altitude: 1 | 2 | 3) => void;
+  onRunwaySelect: (aircraftId: string, runwayId: string | null) => void;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
 }
 
@@ -25,6 +29,7 @@ export default function RadarScreen({
   onAircraftSelected,
   onHoldingToggle,
   onAltitudeChange,
+  onRunwaySelect,
   onCanvasReady,
 }: RadarScreenProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -92,7 +97,7 @@ export default function RadarScreen({
     if (state.phase !== 'playing') return;
     const pos = getPos(e);
 
-    if (state.selectedAircraftId && state.level >= 4) {
+    if (state.selectedAircraftId && state.altitudeEnabled) {
       const selectedAc = state.aircraft.find(a => a.id === state.selectedAircraftId);
       if (selectedAc) {
         const stats = AIRCRAFT_STATS[selectedAc.type];
@@ -106,6 +111,17 @@ export default function RadarScreen({
           const y = startY + i * (btnH + 5);
           if (pos.x >= startX && pos.x <= startX + btnW && pos.y >= y && pos.y <= y + btnH) {
             onAltitudeChange(selectedAc.id, alt);
+            return;
+          }
+        }
+
+        // Check if a runway was clicked
+        const acceptingRunways = getAcceptingAirportRunways(state, selectedAc);
+        for (const runway of acceptingRunways) {
+          if (!runway.isOpen) continue;
+          if (vecDist(pos, runway.position) < 30) {
+            // Toggle runway selection
+            onRunwaySelect(selectedAc.id, selectedAc.targetRunwayId === runway.id ? null : runway.id);
             return;
           }
         }
@@ -130,7 +146,7 @@ export default function RadarScreen({
       onAircraftSelected(null);
       drawingRef.current = { active: false, points: [], aircraftId: null };
     }
-  }, [gameStateRef, findAircraftAt, getPos, onAircraftSelected, onHoldingToggle, onAltitudeChange]);
+  }, [gameStateRef, findAircraftAt, getPos, onAircraftSelected, onHoldingToggle, onAltitudeChange, onRunwaySelect]);
 
   const onMouseMove = useCallback((e: MouseEvent) => {
     if (!drawingRef.current.active) return;
@@ -164,7 +180,7 @@ export default function RadarScreen({
     const touch = e.touches[0];
     const pos = getPos(touch);
 
-    if (state.selectedAircraftId && state.level >= 4) {
+    if (state.selectedAircraftId && state.altitudeEnabled) {
       const selectedAc = state.aircraft.find(a => a.id === state.selectedAircraftId);
       if (selectedAc) {
         const stats = AIRCRAFT_STATS[selectedAc.type];
@@ -178,6 +194,17 @@ export default function RadarScreen({
           const y = startY + i * (btnH + 5);
           if (pos.x >= startX && pos.x <= startX + btnW && pos.y >= y && pos.y <= y + btnH) {
             onAltitudeChange(selectedAc.id, alt);
+            return;
+          }
+        }
+
+        // Check if a runway was clicked
+        const acceptingRunways = getAcceptingAirportRunways(state, selectedAc);
+        for (const runway of acceptingRunways) {
+          if (!runway.isOpen) continue;
+          if (vecDist(pos, runway.position) < 30) {
+            // Toggle runway selection
+            onRunwaySelect(selectedAc.id, selectedAc.targetRunwayId === runway.id ? null : runway.id);
             return;
           }
         }
@@ -197,7 +224,7 @@ export default function RadarScreen({
       drawingRef.current = { active: true, points: [pos], aircraftId: ac.id };
       onAircraftSelected(ac.id);
     }
-  }, [gameStateRef, findAircraftAt, getPos, onAircraftSelected, onHoldingToggle, onAltitudeChange]);
+  }, [gameStateRef, findAircraftAt, getPos, onAircraftSelected, onHoldingToggle, onAltitudeChange, onRunwaySelect]);
 
   const onTouchMove = useCallback((e: TouchEvent) => {
     e.preventDefault();
@@ -262,7 +289,9 @@ export function renderFrame(state: GameState, canvas: HTMLCanvasElement): void {
   const W = canvas.width;
   const H = canvas.height;
   const now = Date.now();
-  const config = LEVELS[state.level - 1] ?? LEVELS[0];
+  const config = state.survivalState 
+    ? getSurvivalLevelConfig(state.survivalState.round) 
+    : (LEVELS[state.level - 1] ?? LEVELS[0]);
 
   // ── Background ────────────────────────────────────────────
   ctx.save();
@@ -272,8 +301,8 @@ export function renderFrame(state: GameState, canvas: HTMLCanvasElement): void {
     ctx.translate(shakeX, shakeY);
   }
 
-  ctx.fillStyle = COLORS.BG_DEEP;
-  ctx.fillRect(0, 0, W, H);
+  const bgTheme = getBackgroundTheme();
+  drawBackground(ctx, W, H, bgTheme, now);
 
   // ── Radar Grid ────────────────────────────────────────────
   drawRadarGrid(ctx, W, H);
@@ -291,6 +320,35 @@ export function renderFrame(state: GameState, canvas: HTMLCanvasElement): void {
   // ── Runways ───────────────────────────────────────────────
   for (const runway of state.runways) {
     drawRunway(ctx, runway, now, state.windDirection, state.windStrength);
+    
+    // Highlight if selected by the currently selected aircraft
+    if (state.selectedAircraftId) {
+      const selectedAc = state.aircraft.find(a => a.id === state.selectedAircraftId);
+      if (selectedAc && selectedAc.targetRunwayId === runway.id) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(runway.position.x, runway.position.y, 25, 0, Math.PI * 2);
+        ctx.strokeStyle = '#00F0FF';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        
+        ctx.font = 'bold 10px "JetBrains Mono"';
+        ctx.fillStyle = '#00F0FF';
+        ctx.textAlign = 'center';
+        ctx.fillText('TARGET', runway.position.x, runway.position.y - 30);
+        ctx.restore();
+      } else if (selectedAc && !selectedAc.targetRunwayId && getAcceptingAirportRunways(state, selectedAc).some(r => r.id === runway.id)) {
+        // Highlight compatible runways if none is selected
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(runway.position.x, runway.position.y, 20, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(0, 240, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
   }
 
   // ── Bird Strike Zone ──────────────────────────────────────
@@ -537,7 +595,9 @@ function getAcceptingAirportRunways(state: GameState, ac: Aircraft): Runway[] {
 
 // ── Aircraft visibility (IFR mode) ───────────────────────────
 function getPhosphorState(ac: Aircraft, state: GameState, W: number, H: number): { alpha: number, colorOverride: string | null } {
-  const config = LEVELS[state.level - 1] ?? LEVELS[0];
+  const config = state.survivalState 
+    ? getSurvivalLevelConfig(state.survivalState.round) 
+    : (LEVELS[state.level - 1] ?? LEVELS[0]);
   if (!config.hasRadarSweep) return { alpha: 1, colorOverride: null };
 
   const cx = W / 2, cy = H / 2;
@@ -633,7 +693,9 @@ function drawAircraft(
 
   // ── Target airport — centred BELOW the aircraft in blue ──
   if (ac.targetAirportId) {
-    const config = LEVELS[state.level - 1] ?? LEVELS[0];
+    const config = state.survivalState 
+      ? getSurvivalLevelConfig(state.survivalState.round) 
+      : (LEVELS[state.level - 1] ?? LEVELS[0]);
     const airportCode = config.airport.id === ac.targetAirportId ? config.airport.icao : ac.targetAirportId.toUpperCase();
 
     ctx.font = `bold 14px "JetBrains Mono","Courier New",monospace`;
@@ -688,7 +750,7 @@ function drawAircraft(
   }
 
   // ── Altitude Menu (Level 4+) ───────────────────────────────
-  if (state.level >= 4) {
+  if (state.altitudeEnabled) {
     if (selected) {
       const options = [3, 2, 1];
       const btnW = 40;

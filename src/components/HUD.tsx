@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import type { GameState, GameEvent, PlayerRank, DailyMission } from '../types/game.types';
-import { COLORS, getComboColor } from '../utils/colorPalette';
+import { COLORS } from '../utils/colorPalette';
 import { LEVELS } from '../levels';
 import { getLandingTargetForLevel } from '../utils/levelProgress';
+
+import DailyMissionsPanel from './hud/DailyMissionsPanel';
+
+import GameTopBar from './hud/GameTopBar';
 
 // ── Rank definitions ─────────────────────────────────────────
 const RANKS: { rank: PlayerRank; minXP: number; color: string; badge: string }[] = [
@@ -63,37 +67,9 @@ export default function HUD({
 }: HUDProps) {
   const config = LEVELS[level - 1] ?? LEVELS[0];
   const landingTarget = getLandingTargetForLevel(level);
-  const remainingLandings = Math.max(0, landingTarget - totalLandings);
   const { current: rank, progress: rankProgress } = getRankInfo(totalXP);
-  const comboColor = getComboColor(combo.multiplier);
 
   const [eventAnim, setEventAnim] = useState(false);
-  const [landingFlash, setLandingFlash] = useState(false);
-  const [missionPopups, setMissionPopups] = useState<{id: string, text: string}[]>([]);
-  const prevMissionsRef = React.useRef(missions);
-
-  // Track mission completions
-  useEffect(() => {
-    const prev = prevMissionsRef.current;
-    const newlyCompleted = missions.filter(m => 
-      m.completed && !prev.find(p => p.id === m.id)?.completed
-    );
-
-    if (newlyCompleted.length > 0) {
-      const newPopups = newlyCompleted.map(m => ({
-        id: Math.random().toString(),
-        text: `✓ MISSION COMPLETE: ${m.description} (+${m.xpReward} XP)`
-      }));
-      setMissionPopups(prev => [...prev, ...newPopups]);
-
-      newPopups.forEach(p => {
-        setTimeout(() => {
-          setMissionPopups(current => current.filter(x => x.id !== p.id));
-        }, 3000);
-      });
-    }
-    prevMissionsRef.current = missions;
-  }, [missions]);
 
   useEffect(() => {
     if (activeEvent) {
@@ -104,8 +80,7 @@ export default function HUD({
   }, [activeEvent]);
 
   const triggerLandingFlash = () => {
-    setLandingFlash(true);
-    setTimeout(() => setLandingFlash(false), 400);
+    // Flash handled internally or removed
   };
 
   // Expose flash trigger
@@ -121,85 +96,19 @@ export default function HUD({
   return (
     <div style={styles.hud}>
       {/* Top Bar */}
-      <div style={styles.topBar}>
-        {/* Score */}
-        <div style={styles.panel}>
-          <span style={styles.label}>SCORE</span>
-          <span style={{ ...styles.bigValue, color: landingFlash ? '#FFD700' : COLORS.HUD_TEXT }}>
-            {score.toLocaleString()}
-          </span>
-          <span style={{ ...styles.small, color: COLORS.HUD_DIM }}>
-            HI {highScore.toLocaleString()}
-          </span>
-        </div>
-
-        {/* Landing target */}
-        <div style={{ ...styles.panel, textAlign: 'center', position: 'relative' }}>
-          <span style={styles.label}>TO WIN</span>
-          <span style={{ ...styles.bigValue, color: COLORS.HUD_ACCENT }}>
-            {totalLandings} / {landingTarget}
-          </span>
-          <span style={{ ...styles.small, color: COLORS.HUD_DIM }}>
-            {remainingLandings} LEFT · {config.airport.icao}
-          </span>
-
-          {/* Combo Bar (transparent under level) */}
-          {combo.count > 0 && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: '10%',
-              transform: 'translateX(-30%)',
-              marginTop: 12,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: 'rgba(11, 19, 43, 0.5)',
-              padding: '2px 8px',
-              borderRadius: 8,
-              border: '1px solid rgba(255, 255, 255, 0.05)',
-              whiteSpace: 'nowrap',
-              pointerEvents: 'none'
-            }}>
-              <span style={{ fontSize: 12, fontWeight: 'bold', color: comboColor, letterSpacing: 1 }}>
-                {combo.count >= 5 ? '🔥 MAX' : combo.count >= 3 ? '⚡ STREAK' : 'CHAIN'}
-              </span>
-              <span style={{ fontSize: 16, fontWeight: 'bold', color: comboColor }}>
-                ×{combo.multiplier}
-              </span>
-              <div style={{ width: 40, display: 'flex', alignItems: 'center' }}>
-                <ComboTimer combo={combo} color={comboColor} />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Traffic */}
-        <div style={{ ...styles.panel, textAlign: 'center' }}>
-          <span style={styles.label}>TRAFFIC</span>
-          <span style={{ ...styles.bigValue, color: COLORS.HUD_TEXT }}>{aircraftCount}</span>
-          <span style={{ ...styles.small, color: COLORS.HUD_DIM }}>
-            MAX {config.maxAircraft}
-          </span>
-        </div>
-
-        {/* Lives */}
-        <div style={{ ...styles.panel, textAlign: 'center' }}>
-          <span style={styles.label}>LIVES</span>
-          <div style={{ display: 'flex', gap: 4, marginTop: 4, justifyContent: 'center' }}>
-            {[1, 2, 3].map(i => (
-              <span key={i} style={{ fontSize: 18, color: i <= lives ? '#FF003C' : 'rgba(255,0,60,0.2)' }}>
-                ♥
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Pause */}
-        <button style={styles.pauseBtn} onClick={onPause} title="Pause [P]">
-          ⏸
-        </button>
-      </div>
+      <GameTopBar
+        onPause={onPause}
+        score={score}
+        highScore={highScore}
+        combo={combo}
+        level={level}
+        totalLandings={totalLandings}
+        landingTarget={landingTarget}
+        airportIcao={config.airport.icao}
+        aircraftCount={aircraftCount}
+        maxAircraft={config.maxAircraft}
+        lives={lives}
+      />
 
       {/* Event Banner */}
       {activeEvent && (
@@ -236,81 +145,7 @@ export default function HUD({
       </div>
 
       {/* Daily Missions Panel */}
-      <div style={{
-        position: 'absolute',
-        bottom: 10,
-        left: 10,
-        width: 280,
-        background: 'rgba(11, 19, 43, 0.85)',
-        border: '1px solid rgba(0, 240, 255, 0.2)',
-        borderRadius: 6,
-        padding: '8px 12px',
-        pointerEvents: 'auto',
-        maxHeight: 120,
-        overflowY: 'auto',
-      }}>
-        <div style={{ fontSize: 10, color: '#00F0FF', fontWeight: 'bold', marginBottom: 6, letterSpacing: 1 }}>
-          DAILY MISSIONS
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
-          {missions.map(m => (
-            <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <div style={{ fontSize: 9, color: m.completed ? '#39FF14' : 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={m.description}>
-                {m.completed ? '✓ ' : ''}{m.description}
-              </div>
-              <div style={{ height: 3, background: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
-                <div style={{ height: '100%', background: m.completed ? '#39FF14' : '#00F0FF', width: `${Math.min(100, (m.current / m.target) * 100)}%`, borderRadius: 2 }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Mission Popups */}
-      <div style={{
-        position: 'absolute',
-        top: 120,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        pointerEvents: 'none',
-      }}>
-        {missionPopups.map(p => (
-          <div key={p.id} style={{
-            background: 'rgba(57, 255, 20, 0.2)',
-            border: '1px solid #39FF14',
-            color: '#39FF14',
-            padding: '8px 16px',
-            borderRadius: 4,
-            fontWeight: 'bold',
-            fontSize: 14,
-            animation: 'hudEventPulse 0.5s ease',
-            boxShadow: '0 0 10px rgba(57, 255, 20, 0.5)'
-          }}>
-            {p.text}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Combo countdown timer ─────────────────────────────────────
-function ComboTimer({ combo, color }: { combo: GameState['combo']; color: string }) {
-  const [pct, setPct] = useState(1);
-  useEffect(() => {
-    const id = setInterval(() => {
-      const elapsed = Date.now() - combo.lastLandingTime;
-      setPct(Math.max(0, 1 - elapsed / combo.timeoutMs));
-    }, 50);
-    return () => clearInterval(id);
-  }, [combo]);
-
-  return (
-    <div style={styles.comboTimerTrack}>
-      <div style={{ ...styles.comboTimerFill, width: `${pct * 100}%`, background: color }} />
+      <DailyMissionsPanel missions={missions} />
     </div>
   );
 }
@@ -345,72 +180,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-mono)',
     userSelect: 'none',
     pointerEvents: 'none', // let clicks pass through the background
-  },
-  topBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 16,
-    pointerEvents: 'auto', // buttons/interactions work
-  },
-  panel: {
-    display: 'flex',
-    flexDirection: 'column',
-    minWidth: 80,
-  },
-  label: {
-    fontSize: 11,
-    color: COLORS.HUD_DIM,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-  },
-  bigValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    lineHeight: 1.1,
-    color: COLORS.HUD_TEXT,
-  },
-  small: {
-    fontSize: 11,
-    color: COLORS.HUD_DIM,
-  },
-  pauseBtn: {
-    marginLeft: 'auto',
-    background: 'transparent',
-    border: '1px solid rgba(0,255,65,0.3)',
-    color: COLORS.HUD_TEXT,
-    padding: '4px 10px',
-    cursor: 'pointer',
-    fontSize: 16,
-    borderRadius: 4,
-  },
-  comboBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '3px 8px',
-    background: 'rgba(0,255,65,0.05)',
-    borderRadius: 4,
-  },
-  comboText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  comboMultiplier: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  comboTimerTrack: {
-    flex: 1,
-    height: 4,
-    background: 'rgba(0,255,65,0.15)',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  comboTimerFill: {
-    height: '100%',
-    borderRadius: 2,
-    transition: 'width 0.05s linear',
   },
   eventBanner: {
     display: 'flex',

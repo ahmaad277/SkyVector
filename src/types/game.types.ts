@@ -117,6 +117,7 @@ export interface ScorePopup {
 }
 
 import type { SurvivalState } from './survival.types';
+import type { MultiplayerState } from '../engine/MultiplayerEngine';
 
 export interface GameState {
   phase: GamePhase | 'survival_complete';
@@ -148,6 +149,8 @@ export interface GameState {
     totalTimeBonuses: number;
   };
   survivalState?: SurvivalState;
+  multiplayerState?: MultiplayerState;
+  altitudeEnabled: boolean;
 }
 
 export interface RankConfig {

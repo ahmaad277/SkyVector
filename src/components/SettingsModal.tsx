@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { LEVELS } from '../levels';
 
+import { THEMES, type BackgroundTheme } from '../utils/backgroundThemes';
+
 interface SettingsModalProps {
   onClose: () => void;
   onUnlockAllStages: () => void;
@@ -28,6 +30,10 @@ export default function SettingsModal({
   const [scanlines, setScanlines] = useState(() => {
     return localStorage.getItem('skyvector_scanlines') !== 'false';
   });
+  const [background, setBackground] = useState<BackgroundTheme>(() => {
+    const saved = localStorage.getItem('skyvector_background');
+    return (saved && saved in THEMES) ? saved as BackgroundTheme : 'classic';
+  });
 
   useEffect(() => {
     localStorage.setItem('skyvector_volume', volume.toString());
@@ -43,6 +49,11 @@ export default function SettingsModal({
     localStorage.setItem('skyvector_scanlines', scanlines.toString());
     window.dispatchEvent(new Event('settings_changed'));
   }, [scanlines]);
+
+  useEffect(() => {
+    localStorage.setItem('skyvector_background', background);
+    window.dispatchEvent(new Event('settings_changed'));
+  }, [background]);
 
   const handleUnlockSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,6 +125,18 @@ export default function SettingsModal({
               onChange={(e) => setScanlines(e.target.checked)} 
               style={styles.checkbox}
             />
+          </div>
+          <div style={styles.row}>
+            <label style={styles.label}>RADAR THEME</label>
+            <select 
+              value={background} 
+              onChange={(e) => setBackground(e.target.value as BackgroundTheme)}
+              style={styles.selectInput}
+            >
+              {Object.entries(THEMES).map(([key, { name }]) => (
+                <option key={key} value={key}>{name}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -232,6 +255,18 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     width: 16,
     height: 16,
+  },
+  selectInput: {
+    flex: 1,
+    background: 'rgba(0,0,0,0.5)',
+    border: '1px solid rgba(0, 240, 255, 0.4)',
+    color: '#00F0FF',
+    padding: '6px 10px',
+    borderRadius: 4,
+    fontFamily: 'var(--font-mono)',
+    fontSize: 12,
+    outline: 'none',
+    cursor: 'pointer',
   },
   settingsText: {
     fontFamily: 'var(--font-mono)',

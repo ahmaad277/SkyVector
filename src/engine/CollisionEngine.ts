@@ -92,7 +92,8 @@ export function checkLandings(
         r.airportId === ac.targetAirportId &&
         r.isOpen &&
         (r.closedUntil === 0 || now >= r.closedUntil) &&
-        acceptsAircraft(r, ac)
+        acceptsAircraft(r, ac) &&
+        (!ac.targetRunwayId || r.id === ac.targetRunwayId)
     );
     if (airportRunways.length === 0) continue;
 

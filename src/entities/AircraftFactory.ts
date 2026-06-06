@@ -21,6 +21,7 @@ export function spawnAircraft(
   config: LevelConfig,
   canvasWidth: number,
   canvasHeight: number,
+  altitudeEnabled: boolean,
   forceNORDO = false
 ) {
   const type = weightedRandom(config.typeWeights);
@@ -42,8 +43,8 @@ export function spawnAircraft(
   const isEmergency = !forceNORDO && roll < 0.08;
   const isNORDO = forceNORDO || (!isEmergency && roll > 0.96);
   
-  // Altitude: level >= 4 uses FL1/FL2/FL3. Spawn at FL3 usually.
-  const altitude = config.id >= 4 ? (Math.random() > 0.5 ? 3 : 2) : 1;
+  // Altitude: If enabled, uses FL1/FL2/FL3. Spawn at FL3 usually.
+  const altitude = altitudeEnabled ? (Math.random() > 0.5 ? 3 : 2) : 1;
 
   return createAircraft(
     type,

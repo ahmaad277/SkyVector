@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { COLORS } from '../utils/colorPalette';
 import SettingsModal from './SettingsModal';
 
 interface MainMenuProps {
   onContinue: () => void;
   onNewGame: () => void;
   onSurvival: () => void;
+  onOnline: () => void;
   onLeaderboard: () => void;
   onUnlockAllStages: () => void;
   onLockAllStages: () => void;
@@ -19,6 +19,7 @@ export default function MainMenu({
   onContinue,
   onNewGame,
   onSurvival,
+  onOnline,
   onLeaderboard,
   onUnlockAllStages,
   onLockAllStages,
@@ -34,6 +35,7 @@ export default function MainMenu({
     { id: 'continue',    label: 'CONTINUE',    action: onContinue,    disabled: !canContinue },
     { id: 'newgame',     label: 'NEW GAME',     action: onNewGame,     disabled: false },
     { id: 'survival',    label: 'SURVIVAL MODE', action: onSurvival,    disabled: false, isSpecial: true },
+    { id: 'online',      label: 'ONLINE MULTIPLAYER', action: onOnline, disabled: false },
     { id: 'leaderboard', label: 'LEADERBOARD',  action: onLeaderboard, disabled: false },
     { id: 'settings',    label: 'SETTINGS',     action: () => setSettingsOpen(true), disabled: false },
   ];
@@ -135,7 +137,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: COLORS.BG_DEEP,
+    background: 'transparent',
     overflow: 'hidden',
     paddingTop: 'env(safe-area-inset-top)',
     paddingBottom: 'env(safe-area-inset-bottom)',

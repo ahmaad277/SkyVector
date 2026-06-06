@@ -17,11 +17,18 @@ import SurvivalModeScreen from './components/SurvivalModeScreen';
 import SurvivalHUD from './components/SurvivalHUD';
 import SurvivalRoundComplete from './components/SurvivalRoundComplete';
 import SurvivalGameOver from './components/SurvivalGameOver';
+import OnlineMenu from './components/OnlineMenu';
+import LobbyScreen from './components/LobbyScreen';
+import { useMultiplayer } from './hooks/useMultiplayer';
 import { createInitialSurvivalState, getRoundLandingTarget, getRoundTimeLimit, applyPowerUp, getSurvivalLevelConfig } from './engine/SurvivalEngine';
 import type { PowerUp, SurvivalState } from './types/survival.types';
 import { LEVELS } from './levels';
 
-type AppScreen = 'menu' | 'stage_select' | 'game' | 'gameover' | 'leaderboard' | 'levelcomplete' | 'survival_menu' | 'survival_complete';
+import { getBackgroundTheme } from './utils/backgroundThemes';
+
+import { createMultiplayerState, type PlayerInput } from './engine/MultiplayerEngine';
+
+type AppScreen = 'menu' | 'stage_select' | 'game' | 'gameover' | 'leaderboard' | 'levelcomplete' | 'survival_menu' | 'survival_complete' | 'online_menu' | 'lobby';
 
 export default function App() {
   // ── UI state (React) ─────────────────────────────────────
@@ -42,6 +49,14 @@ export default function App() {
     parseInt(localStorage.getItem('skyvector_unlocked') ?? '1', 10) || 1
   );
 
+  const [bgTheme, setBgTheme] = useState(getBackgroundTheme());
+
+  useEffect(() => {
+    const handleSettingsChanged = () => setBgTheme(getBackgroundTheme());
+    window.addEventListener('settings_changed', handleSettingsChanged);
+    return () => window.removeEventListener('settings_changed', handleSettingsChanged);
+  }, []);
+
   // ── Mutable game state (no re-renders during game loop) ──
   const gameStateRef = useRef<GameState>(createInitialGameState(1));
   const maxComboRef = useRef(1);
@@ -61,12 +76,17 @@ export default function App() {
 
   // ── Hooks ────────────────────────────────────────────────
   const { play } = useAudio();
-  const { profile, saveGameResult, progressMission } = useSupabase();
+  const { profile, missions, saveGameResult, progressMission } = useSupabase();
+  const multiplayer = useMultiplayer();
 
   // ── Rendering (called from game loop) ────────────────────
   const renderFrameCb = useCallback(
     (state: GameState, canvas: HTMLCanvasElement) => {
+      // If we are a guest in multiplayer, we don't run the full game loop tick,
+      // but we still need to render. Wait, if we don't run the tick, renderFrameCb isn't called by useGameLoop.
+      // Actually, guests will receive state updates and we should render them.
       renderFrame(state, canvas);
+      
       // Sync aircraft count to React state (cheap — once per frame)
       const active = state.aircraft.filter(
         (a) => a.state !== 'landed' && a.state !== 'crashed'
@@ -75,8 +95,30 @@ export default function App() {
       setCurrentLevel(state.level);
       setLives(state.lives);
       setTotalLandings(state.totalLandings);
+
+      // Multiplayer broadcast
+      if (state.multiplayerState && state.multiplayerState.isHost && multiplayer.channel) {
+        const now = Date.now();
+        if (now - state.multiplayerState.lastBroadcast > 100) {
+          state.multiplayerState.lastBroadcast = now;
+          multiplayer.channel.send({
+            type: 'broadcast',
+            event: 'game_state',
+            payload: {
+              aircraft: state.aircraft,
+              score: state.score,
+              lives: state.lives,
+              phase: state.phase,
+              activeEvent: state.activeEvent,
+              totalLandings: state.totalLandings,
+              combo: state.combo,
+              radarAngle: state.radarAngle,
+            }
+          });
+        }
+      }
     },
-    []
+    [multiplayer.channel]
   );
 
   // ── Game loop callbacks ───────────────────────────────────
@@ -226,6 +268,36 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [screen, isPaused]);
 
+  // ── Multiplayer sync ──────────────────────────────────────
+  useEffect(() => {
+    if (!multiplayer.channel || !multiplayer.room || screen !== 'game') return;
+
+    const isHost = multiplayer.room.host_id === profile.id;
+
+    if (isHost) {
+      // Host receives inputs
+      multiplayer.channel.on('broadcast', { event: 'player_input' }, ({ payload }) => {
+        if (gameStateRef.current.multiplayerState) {
+          gameStateRef.current.multiplayerState.inputQueue.push(payload as PlayerInput);
+        }
+      });
+    } else {
+      // Guest receives state
+      multiplayer.channel.on('broadcast', { event: 'game_state' }, ({ payload }) => {
+        gameStateRef.current = {
+          ...gameStateRef.current,
+          ...payload,
+        };
+        if (gameCanvasRef.current) {
+          renderFrameCb(gameStateRef.current, gameCanvasRef.current);
+        }
+      });
+    }
+
+    return () => {
+      multiplayer.channel?.unsubscribe();
+    };
+  }, [multiplayer.channel, multiplayer.room, profile.id, screen, renderFrameCb]);
   // ── Radar ping every ~3s ──────────────────────────────────
   useEffect(() => {
     if (screen !== 'game' || isPaused) return;
@@ -255,6 +327,7 @@ export default function App() {
     gameStateRef.current.runways = config.runways.map((r) => ({ ...r, isOpen: true, closedUntil: 0 }));
     gameStateRef.current.windDirection = config.windDirection;
     gameStateRef.current.windStrength = config.windStrength;
+    gameStateRef.current.altitudeEnabled = true;
     
     maxComboRef.current = 1;
     setScore(0);
@@ -297,6 +370,7 @@ export default function App() {
       runways: config.runways.map((r) => ({ ...r, isOpen: true, closedUntil: 0 })),
       windDirection: config.windDirection,
       windStrength: config.windStrength,
+      altitudeEnabled: true,
     };
     
     setScreen('game');
@@ -304,8 +378,18 @@ export default function App() {
   }, []);
 
   const handleStartLevel = useCallback(
-    (level: number) => {
+    (level: number, isMultiplayer = false) => {
       gameStateRef.current = createInitialGameState(level);
+      
+      if (isMultiplayer && multiplayer.room) {
+        gameStateRef.current.multiplayerState = createMultiplayerState(
+          multiplayer.room,
+          multiplayer.players,
+          profile.id
+        );
+        gameStateRef.current.altitudeEnabled = true;
+      }
+      
       maxComboRef.current = 1;
       setScore(0);
       setCurrentLevel(level);
@@ -319,7 +403,7 @@ export default function App() {
       setScreen('game');
       setTimeout(() => gameLoopRef.current?.start(), 50);
     },
-    []
+    [multiplayer, profile.id]
   );
 
   const handleContinue = useCallback(() => {
@@ -394,6 +478,15 @@ export default function App() {
 
   // ── Path drawn callback (from RadarScreen) ────────────────
   const handlePathDrawn = useCallback((aircraftId: string, path: Vec2[]) => {
+    if (multiplayer.room && multiplayer.room.host_id !== profile.id && multiplayer.channel) {
+      multiplayer.channel.send({
+        type: 'broadcast',
+        event: 'player_input',
+        payload: { type: 'draw_path', aircraftId, path, playerId: profile.id, seq: Date.now() }
+      });
+      return;
+    }
+
     gameStateRef.current = {
       ...gameStateRef.current,
       aircraft: gameStateRef.current.aircraft.map((a) => {
@@ -418,13 +511,22 @@ export default function App() {
       isDrawing: false,
     };
     play('draw_path');
-  }, [play]);
+  }, [play, multiplayer, profile.id]);
 
   const handleAircraftSelected = useCallback((id: string | null) => {
     gameStateRef.current = { ...gameStateRef.current, selectedAircraftId: id };
   }, []);
 
   const handleHoldingToggle = useCallback((aircraftId: string) => {
+    if (multiplayer.room && multiplayer.room.host_id !== profile.id && multiplayer.channel) {
+      multiplayer.channel.send({
+        type: 'broadcast',
+        event: 'player_input',
+        payload: { type: 'holding_toggle', aircraftId, playerId: profile.id, seq: Date.now() }
+      });
+      return;
+    }
+
     gameStateRef.current = {
       ...gameStateRef.current,
       aircraft: gameStateRef.current.aircraft.map((a) => {
@@ -436,9 +538,18 @@ export default function App() {
       }),
     };
     play('holding_toggle');
-  }, [play]);
+  }, [play, multiplayer, profile.id]);
 
   const handleAltitudeChange = useCallback((aircraftId: string, altitude: 1 | 2 | 3) => {
+    if (multiplayer.room && multiplayer.room.host_id !== profile.id && multiplayer.channel) {
+      multiplayer.channel.send({
+        type: 'broadcast',
+        event: 'player_input',
+        payload: { type: 'altitude_change', aircraftId, altitude, playerId: profile.id, seq: Date.now() }
+      });
+      return;
+    }
+
     gameStateRef.current = {
       ...gameStateRef.current,
       aircraft: gameStateRef.current.aircraft.map((a) => {
@@ -446,15 +557,44 @@ export default function App() {
         return { ...a, targetAltitude: altitude };
       }),
     };
-    play('draw_path'); // Or some other sound
-  }, [play]);
+    play('holding_toggle'); // Using holding_toggle as a generic UI click sound for now
+  }, [play, multiplayer, profile.id]);
+
+  const handleRunwaySelect = useCallback((aircraftId: string, runwayId: string | null) => {
+    if (multiplayer.room && multiplayer.room.host_id !== profile.id && multiplayer.channel) {
+      multiplayer.channel.send({
+        type: 'broadcast',
+        event: 'player_input',
+        payload: { type: 'runway_select', aircraftId, runwayId, playerId: profile.id, seq: Date.now() }
+      });
+      return;
+    }
+
+    gameStateRef.current = {
+      ...gameStateRef.current,
+      aircraft: gameStateRef.current.aircraft.map((a) => {
+        if (a.id !== aircraftId) return a;
+        return { ...a, targetRunwayId: runwayId };
+      }),
+    };
+    play('holding_toggle');
+  }, [play, multiplayer, profile.id]);
 
   // ── Canvas ref bridge ─────────────────────────────────────
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (multiplayer.room && multiplayer.room.status === 'lobby' && screen !== 'lobby') {
+      setScreen('lobby');
+    } else if (multiplayer.room && multiplayer.room.status === 'playing' && screen === 'lobby') {
+      // Start multiplayer game
+      handleStartLevel(multiplayer.room.level, true);
+    }
+  }, [multiplayer.room, screen, handleStartLevel]);
+
   // ── Render ────────────────────────────────────────────────
   return (
-    <div style={appStyles.root}>
+    <div style={appStyles.root} className={`theme-${bgTheme}`}>
       {/* Game canvas — always mounted so ref stays valid */}
       <div
         ref={canvasContainerRef}
@@ -469,7 +609,7 @@ export default function App() {
           {gameStateRef.current.survivalState ? (
             <SurvivalHUD
               survivalState={gameStateRef.current.survivalState}
-              missions={profile.dailyMissions ?? []}
+              missions={missions}
               onPause={handlePause}
             />
           ) : (
@@ -483,7 +623,7 @@ export default function App() {
               activeEvent={activeEvent}
               aircraftCount={aircraftCount}
               lives={lives}
-              missions={profile.dailyMissions ?? []}
+              missions={missions}
               onPause={handlePause}
             />
           )}
@@ -495,6 +635,7 @@ export default function App() {
             onAircraftSelected={handleAircraftSelected}
             onHoldingToggle={handleHoldingToggle}
             onAltitudeChange={handleAltitudeChange}
+            onRunwaySelect={handleRunwaySelect}
             onCanvasReady={(canvas) => { gameCanvasRef.current = canvas; }}
           />
           {isPaused && (
@@ -513,6 +654,7 @@ export default function App() {
           onContinue={handleContinue}
           onNewGame={handleGoToStageSelect}
           onSurvival={() => setScreen('survival_menu')}
+          onOnline={() => setScreen('online_menu')}
           onLeaderboard={() => setScreen('leaderboard')}
           onUnlockAllStages={handleUnlockAllStages}
           onLockAllStages={handleLockAllStages}
@@ -585,6 +727,24 @@ export default function App() {
         />
       )}
 
+      {/* Online Menu */}
+      {screen === 'online_menu' && (
+        <OnlineMenu
+          onBack={() => setScreen('menu')}
+          username={profile.username}
+        />
+      )}
+
+      {/* Lobby Screen */}
+      {screen === 'lobby' && (
+        <LobbyScreen
+          multiplayer={multiplayer}
+          onBack={() => setScreen('menu')}
+          onStartGame={() => {}} // handled by useEffect
+          currentUserId={profile.id}
+        />
+      )}
+
       {/* Leaderboard */}
       {screen === 'leaderboard' && (
         <Leaderboard
@@ -602,7 +762,6 @@ const appStyles: Record<string, React.CSSProperties> = {
     width: '100vw',
     height: '100dvh',
     overflow: 'hidden',
-    background: '#0B132B',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',

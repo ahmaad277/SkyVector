@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { COLORS } from '../utils/colorPalette';
 import type { LeaderboardEntry } from '../types/game.types';
-import { getLeaderboard } from '../supabase/queries';
+import { getLeaderboard, subscribeToLeaderboard } from '../supabase/queries';
 
 interface LeaderboardProps {
   onClose: () => void;
@@ -19,6 +19,14 @@ export default function Leaderboard({ onClose, currentPlayerScore }: Leaderboard
       .then(setEntries)
       .catch(console.error)
       .finally(() => setLoading(false));
+
+    const unsubscribe = subscribeToLeaderboard(() => {
+      getLeaderboard(tab).then(setEntries).catch(console.error);
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [tab]);
 
   return (

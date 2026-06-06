@@ -12,7 +12,7 @@ import {
 import { LEVELS } from '../levels';
 import { getLandingTargetForLevel } from '../utils/levelProgress';
 import { getSurvivalLevelConfig, processSurvivalLanding, expireBuffs, hasBuff, consumeIronShield } from './SurvivalEngine';
-
+import { applyPlayerInput } from './MultiplayerEngine';
 
 interface UseGameLoopOptions {
   gameStateRef: React.MutableRefObject<GameState>;
@@ -73,12 +73,26 @@ export function useGameLoop(options: UseGameLoopOptions) {
         ? getSurvivalLevelConfig(state.survivalState!.round)
         : (LEVELS[state.level - 1] ?? LEVELS[0]);
 
-      // ── 1. Radar sweep ────────────────────────────────────
       const radarSpeed = config.hasRadarSweep ? 240 : 45;
+
+      // ── 0.5 Multiplayer Inputs ─────────────────────────────
       let newState: GameState = {
         ...state,
         radarAngle: (state.radarAngle + radarSpeed * dt) % 360,
       };
+
+      if (state.multiplayerState && state.multiplayerState.isHost) {
+        const queue = state.multiplayerState.inputQueue;
+        if (queue.length > 0) {
+          for (const input of queue) {
+            newState = applyPlayerInput(newState, input);
+          }
+          newState.multiplayerState = { ...state.multiplayerState, inputQueue: [] };
+        }
+      }
+
+      // ── 1. Radar sweep ────────────────────────────────────
+      // (radarAngle updated above)
 
       // ── 0. Survival Check ─────────────────────────────────
       if (isSurvival && state.survivalState) {
@@ -114,7 +128,7 @@ export function useGameLoop(options: UseGameLoopOptions) {
         newState.aircraft.filter((a) => a.state !== 'landed' && a.state !== 'crashed').length <
           config.maxAircraft
       ) {
-        const newAc = spawnAircraft(config, canvas.width, canvas.height);
+        const newAc = spawnAircraft(config, canvas.width, canvas.height, newState.altitudeEnabled);
         if (newAc) {
           if (newAc.isNORDO) {
             const validRunways = config.runways.filter((r) => {
@@ -321,7 +335,7 @@ export function useGameLoop(options: UseGameLoopOptions) {
         onEventTriggered(newState.activeEvent);
         
         if (event.type === 'nordo_flight') {
-          const newAc = spawnAircraft(config, canvas.width, canvas.height, true);
+          const newAc = spawnAircraft(config, canvas.width, canvas.height, newState.altitudeEnabled, true);
           if (newAc) {
             const validRunways = config.runways.filter((r) => {
               if (newAc.type === 'helicopter') return r.type === 'helipad';
@@ -368,6 +382,16 @@ export function useGameLoop(options: UseGameLoopOptions) {
         renderFrame(gameStateRef.current, canvas);
         onLevelComplete(newState.level);
         return;
+      }
+
+      // ── 9. Broadcast State (Host only) ──────────────────────
+      if (newState.multiplayerState && newState.multiplayerState.isHost) {
+        // Broadcast every ~100ms
+        if (now - (newState.multiplayerState as any).lastBroadcast > 100) {
+          (newState.multiplayerState as any).lastBroadcast = now;
+          // In a real app, we'd use channel.send() here.
+          // We'll wire this up in App.tsx
+        }
       }
 
       gameStateRef.current = newState;
@@ -440,6 +464,7 @@ export function createInitialGameState(level: number): GameState {
     drawingPath: [],
     isDrawing: false,
     scorePopups: [],
+    altitudeEnabled: level >= 4,
     levelStats: {
       perfectLandings: 0,
       fastestLanding: Infinity,

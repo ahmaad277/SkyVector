@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { COLORS } from '../utils/colorPalette';
 import { LEVELS } from '../levels';
 
 interface StageSelectScreenProps {
@@ -141,7 +140,7 @@ const styles: Record<string, React.CSSProperties> = {
     inset: 0,
     display: 'flex',
     flexDirection: 'column',
-    background: COLORS.BG_DEEP,
+    background: 'transparent',
     overflow: 'hidden',
     paddingTop: 'env(safe-area-inset-top)',
     paddingBottom: 'env(safe-area-inset-bottom)',
