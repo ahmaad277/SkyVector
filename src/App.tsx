@@ -13,7 +13,15 @@ import { useAudio } from './hooks/useAudio';
 import { useSupabase } from './hooks/useSupabase';
 import { simplifyPath, smoothPath, findClosestForwardProgress } from './utils/pathMath';
 
-type AppScreen = 'menu' | 'stage_select' | 'game' | 'gameover' | 'leaderboard' | 'levelcomplete';
+import SurvivalModeScreen from './components/SurvivalModeScreen';
+import SurvivalHUD from './components/SurvivalHUD';
+import SurvivalRoundComplete from './components/SurvivalRoundComplete';
+import SurvivalGameOver from './components/SurvivalGameOver';
+import { createInitialSurvivalState, getRoundLandingTarget, getRoundTimeLimit, applyPowerUp } from './engine/SurvivalEngine';
+import type { PowerUp, SurvivalState } from './types/survival.types';
+import { LEVELS } from './levels';
+
+type AppScreen = 'menu' | 'stage_select' | 'game' | 'gameover' | 'leaderboard' | 'levelcomplete' | 'survival_menu' | 'survival_complete';
 
 export default function App() {
   // ── UI state (React) ─────────────────────────────────────
@@ -26,12 +34,12 @@ export default function App() {
   const [aircraftCount, setAircraftCount] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [gameOverData, setGameOverData] = useState({
-    score: 0, maxCombo: 1, totalLandings: 0, level: 1, reason: 'collision' as 'collision' | 'fuel' | 'vip_delay'
+    score: 0, maxCombo: 1, totalLandings: 0, level: 1, reason: 'collision' as 'collision' | 'fuel' | 'vip_delay', isNewBest: false
   });
   const [submitting, setSubmitting] = useState(false);
   const [sessionStart, setSessionStart] = useState(Date.now());
   const [unlockedLevel, setUnlockedLevel] = useState(() =>
-    parseInt(localStorage.getItem('skyvector_unlocked') ?? '1', 10)
+    parseInt(localStorage.getItem('skyvector_unlocked') ?? '1', 10) || 1
   );
 
   // ── Mutable game state (no re-renders during game loop) ──
@@ -76,9 +84,15 @@ export default function App() {
   const handleComboUpdate = useCallback((c: GameState['combo']) => setCombo(c), []);
 
   const handleGameOver = useCallback(
-    async (finalScore: number, maxCombo: number, reason: 'collision' | 'fuel' | 'vip_delay') => {
+    async (finalScore: number, maxCombo: number, reason: 'collision' | 'fuel' | 'vip_delay' | 'survival_health') => {
       const state = gameStateRef.current;
       play('collision');
+      
+      if (state.survivalState) {
+        setScreen('gameover');
+        return;
+      }
+
       const currentLevel = state.level;
       const currentHighScore = highScores[currentLevel] || 0;
       const isNewBest = finalScore > currentHighScore;
@@ -96,7 +110,8 @@ export default function App() {
         maxCombo,
         totalLandings: state.totalLandings,
         level: state.level,
-        reason,
+        reason: reason as 'collision' | 'fuel' | 'vip_delay',
+        isNewBest,
       });
       maxComboRef.current = maxCombo;
       setScreen('gameover');
@@ -130,7 +145,7 @@ export default function App() {
 
   const handleStartNextLevel = useCallback(() => {
     const nextLevel = gameStateRef.current.level + 1;
-    if (nextLevel <= 8) {
+    if (nextLevel <= LEVELS.length) {
       const carriedScore = gameStateRef.current.score;
       setCombo({ count: 0, multiplier: 1, lastLandingTime: 0, timeoutMs: 5000 });
       setActiveEvent(null);
@@ -231,6 +246,52 @@ export default function App() {
   }, [screen, isPaused, play]);
 
   // ── Actions ───────────────────────────────────────────────
+  const handleStartSurvival = useCallback(() => {
+    gameStateRef.current = createInitialGameState(1);
+    gameStateRef.current.survivalState = createInitialSurvivalState();
+    maxComboRef.current = 1;
+    setScore(0);
+    setCurrentLevel(1);
+    setLives(3);
+    setTotalLandings(0);
+    setCombo({ count: 0, multiplier: 1, lastLandingTime: 0, timeoutMs: 5000 });
+    setActiveEvent(null);
+    setIsPaused(false);
+    setSessionStart(Date.now());
+    setScreen('game');
+    setTimeout(() => gameLoopRef.current?.start(), 50);
+  }, []);
+
+  const handleSurvivalRoundNext = useCallback((powerUp: PowerUp) => {
+    const state = gameStateRef.current;
+    if (!state.survivalState) return;
+
+    const nextRound = state.survivalState.round + 1;
+    let newSurvState: SurvivalState = {
+      ...state.survivalState,
+      round: nextRound,
+      roundStartTime: Date.now(),
+      roundTimerMs: getRoundTimeLimit(nextRound),
+      roundLandings: 0,
+      roundLandingTarget: getRoundLandingTarget(nextRound),
+      pendingPowerUpChoices: null,
+    };
+    
+    newSurvState = applyPowerUp(newSurvState, powerUp, Date.now());
+
+    // Keep the same game state mostly, just reset aircraft/events
+    gameStateRef.current = {
+      ...state,
+      phase: 'playing',
+      aircraft: [],
+      activeEvent: null,
+      survivalState: newSurvState,
+    };
+    
+    setScreen('game');
+    setTimeout(() => gameLoopRef.current?.start(), 50);
+  }, []);
+
   const handleStartLevel = useCallback(
     (level: number) => {
       gameStateRef.current = createInitialGameState(level);
@@ -260,8 +321,23 @@ export default function App() {
   }, []);
 
   const handleUnlockAllStages = useCallback(() => {
-    setUnlockedLevel(8);
-    localStorage.setItem('skyvector_unlocked', '8');
+    setUnlockedLevel(LEVELS.length);
+    localStorage.setItem('skyvector_unlocked', String(LEVELS.length));
+  }, []);
+
+  const handleLockAllStages = useCallback(() => {
+    setUnlockedLevel(1);
+    localStorage.setItem('skyvector_unlocked', '1');
+  }, []);
+
+  const handleResetProgress = useCallback(() => {
+    localStorage.clear();
+    setUnlockedLevel(1);
+    setHighScores({ 1: 0 });
+    setScore(0);
+    setCurrentLevel(1);
+    setLives(3);
+    setTotalLandings(0);
   }, []);
 
   const handlePause = useCallback(() => {
@@ -366,19 +442,26 @@ export default function App() {
         }}
       >
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
-          <HUD
-            score={score}
-            highScore={highScore}
-            combo={combo}
-            level={currentLevel}
-            totalLandings={totalLandings}
-            totalXP={profile.totalXP}
-            activeEvent={activeEvent}
-            aircraftCount={aircraftCount}
-            lives={lives}
-            missions={profile.dailyMissions ?? []}
-            onPause={handlePause}
-          />
+          {gameStateRef.current.survivalState ? (
+            <SurvivalHUD
+              survivalState={gameStateRef.current.survivalState}
+              onPause={handlePause}
+            />
+          ) : (
+            <HUD
+              score={score}
+              highScore={highScore}
+              combo={combo}
+              level={currentLevel}
+              totalLandings={totalLandings}
+              totalXP={profile.totalXP}
+              activeEvent={activeEvent}
+              aircraftCount={aircraftCount}
+              lives={lives}
+              missions={profile.dailyMissions ?? []}
+              onPause={handlePause}
+            />
+          )}
         </div>
         <div style={{ ...appStyles.radarWrapper, width: '100%', height: '100%' }}>
           <RadarScreen
@@ -404,10 +487,14 @@ export default function App() {
         <MainMenu
           onContinue={handleContinue}
           onNewGame={handleGoToStageSelect}
+          onSurvival={() => setScreen('survival_menu')}
           onLeaderboard={() => setScreen('leaderboard')}
           onUnlockAllStages={handleUnlockAllStages}
+          onLockAllStages={handleLockAllStages}
+          onResetProgress={handleResetProgress}
           highScore={Math.max(0, ...Object.values(highScores))}
           canContinue={!!localStorage.getItem('skyvector_last_level')}
+          unlockedLevel={unlockedLevel}
         />
       )}
 
@@ -422,19 +509,27 @@ export default function App() {
 
       {/* Game Over */}
       {screen === 'gameover' && (
-        <GameOverScreen
-          score={gameOverData.score}
-          highScore={highScores[gameOverData.level] || 0}
-          maxCombo={gameOverData.maxCombo}
-          totalLandings={gameOverData.totalLandings}
-          level={gameOverData.level}
-          reason={gameOverData.reason}
-          isNewHighScore={gameOverData.score >= (highScores[gameOverData.level] || 0) && gameOverData.score > 0}
-          onRestart={handleRestartFromGameOver}
-          onMenu={() => setScreen('menu')}
-          onSubmitScore={handleSubmitScore}
-          submitting={submitting}
-        />
+        gameStateRef.current.survivalState ? (
+          <SurvivalGameOver
+            state={gameStateRef.current.survivalState}
+            onRetry={handleStartSurvival}
+            onMenu={() => setScreen('menu')}
+          />
+        ) : (
+          <GameOverScreen
+            score={gameOverData.score}
+            highScore={highScores[gameOverData.level] || 0}
+            maxCombo={gameOverData.maxCombo}
+            totalLandings={gameOverData.totalLandings}
+            level={gameOverData.level}
+            reason={gameOverData.reason}
+            isNewHighScore={gameOverData.isNewBest}
+            onRestart={handleRestartFromGameOver}
+            onMenu={() => setScreen('menu')}
+            onSubmitScore={handleSubmitScore}
+            submitting={submitting}
+          />
+        )
       )}
 
       {/* Level Complete Transition */}
@@ -444,6 +539,22 @@ export default function App() {
           stats={gameStateRef.current.levelStats}
           onNextLevel={handleStartNextLevel}
           onMenu={() => setScreen('menu')}
+        />
+      )}
+
+      {/* Survival Round Complete */}
+      {screen === 'survival_complete' && gameStateRef.current.survivalState && (
+        <SurvivalRoundComplete
+          state={gameStateRef.current.survivalState}
+          onSelectPowerUp={handleSurvivalRoundNext}
+        />
+      )}
+
+      {/* Survival Menu */}
+      {screen === 'survival_menu' && (
+        <SurvivalModeScreen
+          onStart={handleStartSurvival}
+          onBack={() => setScreen('menu')}
         />
       )}
 

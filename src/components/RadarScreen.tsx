@@ -360,7 +360,25 @@ export function renderFrame(state: GameState, canvas: HTMLCanvasElement): void {
   }
 
   // ── Scanlines overlay (CRT aesthetic) ────────────────────
-  drawScanlines(ctx, W, H);
+  if (localStorage.getItem('skyvector_scanlines') !== 'false') {
+    drawScanlines(ctx, W, H);
+  }
+  
+  // ── Survival Buffs Visuals ───────────────────────────────
+  if (state.survivalState) {
+    const hasChrono = state.survivalState.activeBuffs.some(b => b.type === 'CHRONO_FREEZE');
+    if (hasChrono) {
+      ctx.fillStyle = 'rgba(0, 200, 255, 0.05)';
+      ctx.fillRect(0, 0, W, H);
+    }
+    const hasShield = state.survivalState.activeBuffs.some(b => b.type === 'IRON_SHIELD');
+    if (hasShield) {
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.1)';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(2, 2, W - 4, H - 4);
+    }
+  }
+
   ctx.restore(); // Restore screen shake translation
 }
 

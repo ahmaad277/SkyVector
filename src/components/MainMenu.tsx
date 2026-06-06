@@ -1,42 +1,39 @@
 import React, { useState } from 'react';
 import { COLORS } from '../utils/colorPalette';
+import SettingsModal from './SettingsModal';
 
 interface MainMenuProps {
   onContinue: () => void;
   onNewGame: () => void;
+  onSurvival: () => void;
   onLeaderboard: () => void;
   onUnlockAllStages: () => void;
+  onLockAllStages: () => void;
+  onResetProgress: () => void;
   highScore: number;
   canContinue: boolean;
+  unlockedLevel: number;
 }
 
 export default function MainMenu({
   onContinue,
   onNewGame,
+  onSurvival,
   onLeaderboard,
   onUnlockAllStages,
+  onLockAllStages,
+  onResetProgress,
   highScore,
   canContinue,
+  unlockedLevel,
 }: MainMenuProps) {
   const [hoveredBtn, setHoveredBtn] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [password, setPassword] = useState('');
-  const [settingsMessage, setSettingsMessage] = useState('');
-
-  const handleUnlockSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password.trim() === 'احمد') {
-      onUnlockAllStages();
-      setSettingsMessage('ALL STAGES UNLOCKED');
-      setPassword('');
-      return;
-    }
-    setSettingsMessage('INVALID PASSWORD');
-  };
 
   const buttons = [
     { id: 'continue',    label: 'CONTINUE',    action: onContinue,    disabled: !canContinue },
     { id: 'newgame',     label: 'NEW GAME',     action: onNewGame,     disabled: false },
+    { id: 'survival',    label: 'SURVIVAL MODE', action: onSurvival,    disabled: false, isSpecial: true },
     { id: 'leaderboard', label: 'LEADERBOARD',  action: onLeaderboard, disabled: false },
     { id: 'settings',    label: 'SETTINGS',     action: () => setSettingsOpen(true), disabled: false },
   ];
@@ -84,7 +81,7 @@ export default function MainMenu({
 
         {/* Navigation buttons */}
         <div style={styles.btnStack}>
-          {buttons.map(({ id, label, action, disabled }) => {
+          {buttons.map(({ id, label, action, disabled, isSpecial }) => {
             const isHovered = hoveredBtn === id && !disabled;
             return (
               <button
@@ -92,7 +89,8 @@ export default function MainMenu({
                 style={{
                   ...styles.btn,
                   ...(disabled ? styles.btnDisabled : {}),
-                  ...(isHovered ? styles.btnHover : {}),
+                  ...(isHovered ? (isSpecial ? styles.btnHoverSpecial : styles.btnHover) : {}),
+                  ...(isSpecial ? styles.btnSpecial : {}),
                 }}
                 onClick={action}
                 disabled={disabled}
@@ -101,11 +99,11 @@ export default function MainMenu({
                 onTouchStart={() => setHoveredBtn(id)}
                 onTouchEnd={() => setHoveredBtn(null)}
               >
-                <span style={disabled ? styles.btnTextDisabled : styles.btnText}>
+                <span style={disabled ? styles.btnTextDisabled : (isSpecial ? styles.btnTextSpecial : styles.btnText)}>
                   {label}
                 </span>
                 {!disabled && (
-                  <span style={{ ...styles.btnArrow, opacity: isHovered ? 1 : 0 }}>
+                  <span style={{ ...(isSpecial ? styles.btnArrowSpecial : styles.btnArrow), opacity: isHovered ? 1 : 0 }}>
                     ›
                   </span>
                 )}
@@ -118,39 +116,13 @@ export default function MainMenu({
       </div>
 
       {settingsOpen && (
-        <div style={styles.modalBackdrop}>
-          <form style={styles.settingsModal} onSubmit={handleUnlockSubmit}>
-            <div style={styles.settingsTitle}>SETTINGS</div>
-            <div style={styles.settingsText}>ENTER ADMIN PASSWORD TO UNLOCK ALL STAGES</div>
-            <input
-              style={styles.passwordInput}
-              type="password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setSettingsMessage('');
-              }}
-              placeholder="PASSWORD"
-              autoFocus
-            />
-            {settingsMessage && (
-              <div style={{
-                ...styles.settingsMessage,
-                color: settingsMessage.includes('UNLOCKED') ? '#39FF14' : '#FF003C',
-              }}>
-                {settingsMessage}
-              </div>
-            )}
-            <div style={styles.settingsActions}>
-              <button type="button" style={styles.secondaryBtn} onClick={() => setSettingsOpen(false)}>
-                CLOSE
-              </button>
-              <button type="submit" style={styles.primaryBtn}>
-                UNLOCK
-              </button>
-            </div>
-          </form>
-        </div>
+        <SettingsModal
+          onClose={() => setSettingsOpen(false)}
+          onUnlockAllStages={onUnlockAllStages}
+          onLockAllStages={onLockAllStages}
+          onResetProgress={onResetProgress}
+          unlockedLevel={unlockedLevel}
+        />
       )}
     </div>
   );
@@ -335,6 +307,32 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     letterSpacing: 3,
     color: 'rgba(255,255,255,0.3)',
+  },
+  btnSpecial: {
+    background: 'rgba(255, 0, 60, 0.08)',
+    border: '1px solid rgba(255, 0, 60, 0.4)',
+    boxShadow: 'inset 0 0 16px rgba(255,0,60,0.05)',
+  },
+  btnHoverSpecial: {
+    background: 'rgba(255, 0, 60, 0.15)',
+    border: '1px solid rgba(255, 0, 60, 0.8)',
+    boxShadow: '0 0 20px rgba(255,0,60,0.4), inset 0 0 20px rgba(255,0,60,0.1)',
+    transform: 'translateY(-1px)',
+  },
+  btnTextSpecial: {
+    fontFamily: 'var(--font-title)',
+    fontSize: 13,
+    fontWeight: 700,
+    letterSpacing: 3,
+    color: '#FF003C',
+    textShadow: '0 0 10px rgba(255,0,60,0.6)',
+  },
+  btnArrowSpecial: {
+    position: 'absolute',
+    right: 20,
+    fontSize: 20,
+    color: '#FF003C',
+    transition: 'opacity 0.18s ease',
   },
   btnArrow: {
     position: 'absolute',

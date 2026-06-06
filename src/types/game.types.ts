@@ -116,8 +116,10 @@ export interface ScorePopup {
   createdAt: number;
 }
 
+import type { SurvivalState } from './survival.types';
+
 export interface GameState {
-  phase: GamePhase;
+  phase: GamePhase | 'survival_complete';
   level: number;
   score: number;
   highScore: number;
@@ -139,12 +141,13 @@ export interface GameState {
   scorePopups: ScorePopup[];
   screenShakeUntil?: number;
   invulnerableUntil?: number;
-  gameOverReason?: 'collision' | 'fuel' | 'vip_delay';
+  gameOverReason?: 'collision' | 'fuel' | 'vip_delay' | 'survival_health';
   levelStats: {
     perfectLandings: number;
     fastestLanding: number;
     totalTimeBonuses: number;
   };
+  survivalState?: SurvivalState;
 }
 
 export interface RankConfig {

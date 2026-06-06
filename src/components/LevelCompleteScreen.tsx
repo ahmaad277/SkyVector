@@ -1,6 +1,8 @@
 import React from 'react';
 import { COLORS } from '../utils/colorPalette';
 
+import { LEVELS } from '../levels';
+
 interface LevelCompleteScreenProps {
   level: number;
   stats: {
@@ -13,7 +15,7 @@ interface LevelCompleteScreenProps {
 }
 
 export default function LevelCompleteScreen({ level, stats, onNextLevel, onMenu }: LevelCompleteScreenProps) {
-  const isFinalLevel = level >= 8;
+  const isFinalLevel = level >= LEVELS.length;
 
   return (
     <div style={styles.overlay}>

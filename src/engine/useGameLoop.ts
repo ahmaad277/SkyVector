@@ -11,6 +11,7 @@ import {
 } from './EventBus';
 import { LEVELS } from '../levels';
 import { getLandingTargetForLevel } from '../utils/levelProgress';
+import { getSurvivalLevelConfig, processSurvivalLanding, expireBuffs, hasBuff, consumeIronShield } from './SurvivalEngine';
 
 
 interface UseGameLoopOptions {
@@ -18,7 +19,7 @@ interface UseGameLoopOptions {
   canvasRef: React.MutableRefObject<HTMLCanvasElement | null>;
   onScoreUpdate: (score: number) => void;
   onComboUpdate: (combo: GameState['combo']) => void;
-  onGameOver: (finalScore: number, maxCombo: number, reason: 'collision' | 'fuel' | 'vip_delay') => void;
+  onGameOver: (finalScore: number, maxCombo: number, reason: 'collision' | 'fuel' | 'vip_delay' | 'survival_health') => void;
   onLevelComplete: (level: number) => void;
   onEventTriggered: (event: GameState['activeEvent']) => void;
   onLanding: (callsign: string, isNORDO: boolean, isEmergency: boolean) => void;
@@ -67,7 +68,10 @@ export function useGameLoop(options: UseGameLoopOptions) {
       }
 
       const now = Date.now();
-      const config: LevelConfig = LEVELS[state.level - 1] ?? LEVELS[0];
+      const isSurvival = !!state.survivalState;
+      const config: LevelConfig = isSurvival 
+        ? getSurvivalLevelConfig(state.survivalState!.round)
+        : (LEVELS[state.level - 1] ?? LEVELS[0]);
 
       // ── 1. Radar sweep ────────────────────────────────────
       const radarSpeed = config.hasRadarSweep ? 240 : 45;
@@ -75,6 +79,34 @@ export function useGameLoop(options: UseGameLoopOptions) {
         ...state,
         radarAngle: (state.radarAngle + radarSpeed * dt) % 360,
       };
+
+      // ── 0. Survival Check ─────────────────────────────────
+      if (isSurvival && state.survivalState) {
+        let survState = expireBuffs(state.survivalState, now);
+        
+        // Timer check
+        const elapsed = now - survState.roundStartTime;
+        if (elapsed >= survState.roundTimerMs) {
+          if (survState.roundLandings < survState.roundLandingTarget) {
+             isRunningRef.current = false;
+             gameStateRef.current = { ...newState, phase: 'gameover', gameOverReason: 'survival_health', survivalState: survState };
+             renderFrame(gameStateRef.current, canvas);
+             onGameOver(newState.score, maxComboRef.current, 'survival_health');
+             return;
+          }
+        }
+        
+        // Check if round complete
+        if (survState.pendingPowerUpChoices) {
+           isRunningRef.current = false;
+           gameStateRef.current = { ...newState, phase: 'survival_complete', survivalState: survState };
+           renderFrame(gameStateRef.current, canvas);
+           onLevelComplete(survState.round);
+           return;
+        }
+
+        newState.survivalState = survState;
+      }
 
       // ── 2. Spawn new aircraft ─────────────────────────────
       if (
@@ -102,27 +134,50 @@ export function useGameLoop(options: UseGameLoopOptions) {
       }
 
       // ── 3. Update all aircraft ────────────────────────────
+      const isChronoFreeze = isSurvival && hasBuff(newState.survivalState!, 'CHRONO_FREEZE');
+      const effectiveDt = isChronoFreeze ? dt * 0.5 : dt;
+
       newState.aircraft = newState.aircraft.map((ac) =>
-        updateAircraft(ac, dt, newState.windDirection, newState.windStrength)
+        updateAircraft(ac, effectiveDt, newState.windDirection, newState.windStrength)
       );
 
       // ── Check for fuel crashes and VIP/Mayday delays ────────
       const isInvulnerable = newState.invulnerableUntil ? now < newState.invulnerableUntil : false;
 
-      const fuelCrashed = newState.aircraft.find(a => a.state === 'crashed' && a.fuel <= 0);
-      if (fuelCrashed) {
-        if (!isInvulnerable) {
+      const handleDamage = (reason: 'collision' | 'fuel' | 'vip_delay', amount: number = 1) => {
+        if (isInvulnerable) return false;
+        
+        if (isSurvival && newState.survivalState) {
+          if (hasBuff(newState.survivalState, 'IRON_SHIELD')) {
+            newState.survivalState = consumeIronShield(newState.survivalState);
+            newState.invulnerableUntil = now + 2000;
+            return false;
+          }
+          newState.survivalState.health -= amount;
+          if (newState.survivalState.health <= 0) {
+            isRunningRef.current = false;
+            gameStateRef.current = { ...newState, phase: 'gameover', gameOverReason: 'survival_health' };
+            renderFrame(gameStateRef.current, canvas);
+            onGameOver(newState.score, maxComboRef.current, 'survival_health');
+            return true;
+          }
+        } else {
           newState.lives -= 1;
           if (newState.lives <= 0) {
             isRunningRef.current = false;
-            gameStateRef.current = { ...newState, phase: 'gameover', gameOverReason: 'fuel' };
+            gameStateRef.current = { ...newState, phase: 'gameover', gameOverReason: reason };
             renderFrame(gameStateRef.current, canvas);
-            onGameOver(newState.score, maxComboRef.current, 'fuel');
-            return;
-          } else {
-            newState.invulnerableUntil = now + 2000;
+            onGameOver(newState.score, maxComboRef.current, reason);
+            return true;
           }
         }
+        newState.invulnerableUntil = now + 2000;
+        return false;
+      };
+
+      const fuelCrashed = newState.aircraft.find(a => a.state === 'crashed' && a.fuel <= 0);
+      if (fuelCrashed) {
+        if (handleDamage('fuel', 1)) return;
         // Remove the crashed aircraft so it doesn't keep triggering
         newState.aircraft = newState.aircraft.filter(a => a.id !== fuelCrashed.id);
       }
@@ -144,18 +199,7 @@ export function useGameLoop(options: UseGameLoopOptions) {
       });
 
       if (delayedVIPOrMayday) {
-        if (!isInvulnerable) {
-          newState.lives -= 1;
-          if (newState.lives <= 0) {
-            isRunningRef.current = false;
-            gameStateRef.current = { ...newState, phase: 'gameover', gameOverReason: 'vip_delay' };
-            renderFrame(gameStateRef.current, canvas);
-            onGameOver(newState.score, maxComboRef.current, 'vip_delay');
-            return;
-          } else {
-            newState.invulnerableUntil = now + 2000;
-          }
-        }
+        if (handleDamage('vip_delay', 1)) return;
         newState.aircraft = newState.aircraft.filter(a => a.id !== delayedVIPOrMayday.id);
       }
 
@@ -170,22 +214,13 @@ export function useGameLoop(options: UseGameLoopOptions) {
       );
 
       if (collision && colliderIds) {
-        if (!isInvulnerable) {
-          newState.lives -= 1;
-          newState.collisions += 1;
-          newState.screenShakeUntil = now + 300;
-          if (newState.lives <= 0) {
-            newState.aircraft = newState.aircraft.map((a) =>
-              colliderIds.includes(a.id) ? { ...a, state: 'crashed' } : a
-            );
-            isRunningRef.current = false;
-            gameStateRef.current = { ...newState, phase: 'gameover', gameOverReason: 'collision' };
-            renderFrame(gameStateRef.current, canvas);
-            onGameOver(newState.score, maxComboRef.current, 'collision');
-            return;
-          } else {
-            newState.invulnerableUntil = now + 2000;
-          }
+        newState.collisions += 1;
+        newState.screenShakeUntil = now + 300;
+        if (handleDamage('collision', 2)) {
+          newState.aircraft = newState.aircraft.map((a) =>
+            colliderIds.includes(a.id) ? { ...a, state: 'crashed' } : a
+          );
+          return;
         }
         // Remove collided aircraft so they don't keep colliding
         newState.aircraft = newState.aircraft.filter(a => !colliderIds.includes(a.id));
@@ -199,13 +234,29 @@ export function useGameLoop(options: UseGameLoopOptions) {
       }
 
       // ── 5. Landing checks ─────────────────────────────────
-      const landingResults = checkLandings(newState.aircraft, newState.runways, now, newState.windDirection, newState.windStrength);
+      const isOmni = isSurvival && hasBuff(newState.survivalState!, 'OMNIDIRECTIONAL');
+      const isExtended = isSurvival && hasBuff(newState.survivalState!, 'EXTENDED_APPROACH');
+      
+      const landingResults = checkLandings(
+        newState.aircraft, 
+        newState.runways, 
+        now, 
+        newState.windDirection, 
+        newState.windStrength,
+        isOmni,
+        isExtended
+      );
       let scoreGain = 0;
       let didLand = false;
 
       for (const result of landingResults) {
         const combo = updateCombo(newState, now, true);
-        const multiplied = result.scoreGain * combo.multiplier;
+        let multiplied = result.scoreGain * combo.multiplier;
+        
+        if (isSurvival && hasBuff(newState.survivalState!, 'DOUBLE_SCORE')) {
+          multiplied *= 2;
+        }
+        
         scoreGain += multiplied;
         didLand = true;
         newState.combo = combo;
@@ -228,6 +279,17 @@ export function useGameLoop(options: UseGameLoopOptions) {
           if (timeInAir < newState.levelStats.fastestLanding) {
             newState.levelStats.fastestLanding = timeInAir;
           }
+
+          if (isSurvival && newState.survivalState) {
+            const isCombo5 = combo.multiplier >= 5 && state.combo.multiplier < 5; // just hit combo 5
+            newState.survivalState = processSurvivalLanding(newState.survivalState, ac.type, isCombo5);
+            
+            // Check if FUEL_RESERVES was just gained
+            if (hasBuff(newState.survivalState, 'FUEL_RESERVES')) {
+              newState.aircraft = newState.aircraft.map(a => ({ ...a, fuel: Math.min(100, a.fuel + 40) }));
+              newState.survivalState.activeBuffs = newState.survivalState.activeBuffs.filter(b => b.type !== 'FUEL_RESERVES');
+            }
+          }
         }
 
         newState.aircraft = newState.aircraft.map((a) =>
@@ -242,6 +304,9 @@ export function useGameLoop(options: UseGameLoopOptions) {
 
       if (scoreGain > 0) {
         newState.score += scoreGain;
+        if (isSurvival && newState.survivalState) {
+          newState.survivalState.totalScore += scoreGain;
+        }
         onScoreUpdate(newState.score);
       }
 
@@ -297,7 +362,7 @@ export function useGameLoop(options: UseGameLoopOptions) {
       newState.scorePopups = (newState.scorePopups ?? []).filter(p => now - p.createdAt < 1500);
 
       // ── 8. Level complete check ───────────────────────────
-      if (newState.totalLandings >= getLandingTargetForLevel(newState.level) && newState.level < LEVELS.length) {
+      if (!isSurvival && newState.totalLandings >= getLandingTargetForLevel(newState.level) && newState.level < LEVELS.length) {
         isRunningRef.current = false;
         gameStateRef.current = { ...newState, phase: 'levelcomplete' };
         renderFrame(gameStateRef.current, canvas);

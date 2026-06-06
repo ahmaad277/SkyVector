@@ -77,7 +77,9 @@ export function checkLandings(
   runways: Runway[],
   now: number,
   windDir?: number,
-  windStrength?: number
+  windStrength?: number,
+  isOmnidirectional: boolean = false,
+  isExtendedApproach: boolean = false
 ): LandingResult[] {
   const results: LandingResult[] = [];
 
@@ -112,15 +114,16 @@ export function checkLandings(
       // Fixed-wing: must be aligned AND near the active threshold (not anywhere on the strip)
       const dynamicAngle = getDynamicRunwayAngle(runway.angle, windDir, windStrength);
       const activeHeading = getActiveApproachHeading(dynamicAngle, windDir, windStrength);
-      const aligned = isAlignedWithRunway(ac.heading, activeHeading, stats.approachTolerance);
+      const aligned = isOmnidirectional || isAlignedWithRunway(ac.heading, activeHeading, stats.approachTolerance);
 
       if (!aligned) continue;
 
       // Distance measured from the ACTIVE THRESHOLD, not runway center
       const threshold = getActiveThresholdPosition(runway, windDir, windStrength);
       const distToThreshold = vecDist(ac.position, threshold);
+      const allowedDistance = isExtendedApproach ? stats.landingDistance * 2 : stats.landingDistance;
 
-      if (distToThreshold < stats.landingDistance) {
+      if (distToThreshold < allowedDistance) {
         // Calculate angle deviation for perfect landing bonus
         let angleDiff = Math.abs(ac.heading - activeHeading);
         if (angleDiff > 180) angleDiff = 360 - angleDiff;
