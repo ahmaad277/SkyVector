@@ -17,7 +17,7 @@ import SurvivalModeScreen from './components/SurvivalModeScreen';
 import SurvivalHUD from './components/SurvivalHUD';
 import SurvivalRoundComplete from './components/SurvivalRoundComplete';
 import SurvivalGameOver from './components/SurvivalGameOver';
-import { createInitialSurvivalState, getRoundLandingTarget, getRoundTimeLimit, applyPowerUp } from './engine/SurvivalEngine';
+import { createInitialSurvivalState, getRoundLandingTarget, getRoundTimeLimit, applyPowerUp, getSurvivalLevelConfig } from './engine/SurvivalEngine';
 import type { PowerUp, SurvivalState } from './types/survival.types';
 import { LEVELS } from './levels';
 
@@ -247,8 +247,15 @@ export default function App() {
 
   // ── Actions ───────────────────────────────────────────────
   const handleStartSurvival = useCallback(() => {
+    const survState = createInitialSurvivalState();
+    const config = getSurvivalLevelConfig(1);
+    
     gameStateRef.current = createInitialGameState(1);
-    gameStateRef.current.survivalState = createInitialSurvivalState();
+    gameStateRef.current.survivalState = survState;
+    gameStateRef.current.runways = config.runways.map((r) => ({ ...r, isOpen: true, closedUntil: 0 }));
+    gameStateRef.current.windDirection = config.windDirection;
+    gameStateRef.current.windStrength = config.windStrength;
+    
     maxComboRef.current = 1;
     setScore(0);
     setCurrentLevel(1);
@@ -278,6 +285,7 @@ export default function App() {
     };
     
     newSurvState = applyPowerUp(newSurvState, powerUp, Date.now());
+    const config = getSurvivalLevelConfig(nextRound);
 
     // Keep the same game state mostly, just reset aircraft/events
     gameStateRef.current = {
@@ -286,6 +294,9 @@ export default function App() {
       aircraft: [],
       activeEvent: null,
       survivalState: newSurvState,
+      runways: config.runways.map((r) => ({ ...r, isOpen: true, closedUntil: 0 })),
+      windDirection: config.windDirection,
+      windStrength: config.windStrength,
     };
     
     setScreen('game');
@@ -358,13 +369,26 @@ export default function App() {
   const handleSubmitScore = useCallback(async () => {
     setSubmitting(true);
     const duration = Math.floor((Date.now() - sessionStart) / 1000);
-    await saveGameResult({
-      score: gameOverData.score,
-      levelReached: gameOverData.level,
-      comboMax: gameOverData.maxCombo,
-      durationSeconds: duration,
-      totalLandings: gameOverData.totalLandings,
-    });
+    
+    // Check if we are submitting a survival score or normal score
+    if (gameStateRef.current.survivalState) {
+      await saveGameResult({
+        score: gameStateRef.current.survivalState.totalScore,
+        levelReached: gameStateRef.current.survivalState.round,
+        comboMax: maxComboRef.current,
+        durationSeconds: duration,
+        totalLandings: gameStateRef.current.survivalState.totalLandings,
+      });
+    } else {
+      await saveGameResult({
+        score: gameOverData.score,
+        levelReached: gameOverData.level,
+        comboMax: gameOverData.maxCombo,
+        durationSeconds: duration,
+        totalLandings: gameOverData.totalLandings,
+      });
+    }
+    
     setSubmitting(false);
   }, [gameOverData, sessionStart, saveGameResult]);
 
@@ -445,6 +469,7 @@ export default function App() {
           {gameStateRef.current.survivalState ? (
             <SurvivalHUD
               survivalState={gameStateRef.current.survivalState}
+              missions={profile.dailyMissions ?? []}
               onPause={handlePause}
             />
           ) : (
@@ -514,6 +539,8 @@ export default function App() {
             state={gameStateRef.current.survivalState}
             onRetry={handleStartSurvival}
             onMenu={() => setScreen('menu')}
+            onSubmitScore={handleSubmitScore}
+            submitting={submitting}
           />
         ) : (
           <GameOverScreen

@@ -5,9 +5,11 @@ interface SurvivalGameOverProps {
   state: SurvivalState;
   onRetry: () => void;
   onMenu: () => void;
+  onSubmitScore?: () => void;
+  submitting?: boolean;
 }
 
-export default function SurvivalGameOver({ state, onRetry, onMenu }: SurvivalGameOverProps) {
+export default function SurvivalGameOver({ state, onRetry, onMenu, onSubmitScore, submitting }: SurvivalGameOverProps) {
   return (
     <div style={styles.overlay}>
       <div style={styles.card}>
@@ -29,6 +31,15 @@ export default function SurvivalGameOver({ state, onRetry, onMenu }: SurvivalGam
             ⌂ MENU
           </button>
         </div>
+        {onSubmitScore && (
+          <button
+            style={styles.btnSubmit}
+            onClick={onSubmitScore}
+            disabled={submitting}
+          >
+            {submitting ? 'SUBMITTING...' : 'SUBMIT TO LEADERBOARD'}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -142,6 +153,19 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'rgba(255,255,255,0.6)',
     fontFamily: 'var(--font-title)',
     fontSize: 13,
+    cursor: 'pointer',
+    borderRadius: 6,
+    letterSpacing: 1,
+  },
+  btnSubmit: {
+    width: '100%',
+    padding: '12px 0',
+    background: 'rgba(0, 240, 255, 0.1)',
+    border: '1px solid rgba(0, 240, 255, 0.5)',
+    color: '#00F0FF',
+    fontFamily: 'var(--font-title)',
+    fontSize: 13,
+    fontWeight: 'bold',
     cursor: 'pointer',
     borderRadius: 6,
     letterSpacing: 1,
