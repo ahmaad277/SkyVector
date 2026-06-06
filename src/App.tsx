@@ -605,6 +605,7 @@ export default function App() {
           position: 'relative',
         }}
       >
+        {/* Top HUD */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
           {gameStateRef.current.survivalState ? (
             <SurvivalHUD
@@ -628,6 +629,7 @@ export default function App() {
             />
           )}
         </div>
+
         <div style={{ ...appStyles.radarWrapper, width: '100%', height: '100%' }}>
           <RadarScreen
             gameStateRef={gameStateRef}

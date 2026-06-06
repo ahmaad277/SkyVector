@@ -35,7 +35,7 @@ export default function DailyMissionsPanel({ missions }: DailyMissionsPanelProps
   return (
     <>
       <div style={{
-        position: 'absolute',
+        position: 'fixed',
         bottom: 10,
         right: 10, // Moved to bottom right
         width: 280,
@@ -46,6 +46,7 @@ export default function DailyMissionsPanel({ missions }: DailyMissionsPanelProps
         pointerEvents: 'auto',
         maxHeight: 120,
         overflowY: 'auto',
+        zIndex: 50,
       }}>
         <div style={{ fontSize: 10, color: '#00F0FF', fontWeight: 'bold', marginBottom: 6, letterSpacing: 1 }}>
           DAILY MISSIONS
@@ -66,7 +67,7 @@ export default function DailyMissionsPanel({ missions }: DailyMissionsPanelProps
 
       {/* Mission Popups */}
       <div style={{
-        position: 'absolute',
+        position: 'fixed',
         top: 120,
         left: '50%',
         transform: 'translateX(-50%)',
@@ -74,6 +75,7 @@ export default function DailyMissionsPanel({ missions }: DailyMissionsPanelProps
         flexDirection: 'column',
         gap: 8,
         pointerEvents: 'none',
+        zIndex: 50,
       }}>
         {missionPopups.map(p => (
           <div key={p.id} style={{
