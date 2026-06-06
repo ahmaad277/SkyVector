@@ -67,9 +67,9 @@ export function getFuelColor(fuel: number): string {
 export function getAircraftColor(
   type: import('../types/game.types').AircraftType,
   isEmergency: boolean,
-  isVIP: boolean
+  isNORDO: boolean
 ): string {
-  if (isVIP) return COLORS.AIRCRAFT_VIP;
+  if (isNORDO) return COLORS.AIRCRAFT_VIP;
   if (isEmergency) return COLORS.AIRCRAFT_EMERGENCY;
   switch (type) {
     case 'fighter':    return COLORS.AIRCRAFT_MILITARY;

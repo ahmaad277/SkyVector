@@ -3,17 +3,21 @@
 // ============================================================
 
 export type AircraftType = 'cessna' | 'jetliner' | 'fighter' | 'helicopter';
-export type AircraftState = 'flying' | 'landing' | 'landed' | 'holding' | 'emergency' | 'crashed' | 'fuel_critical';
+export type AircraftState = 'flying' | 'landing' | 'landed' | 'holding' | 'emergency' | 'crashed' | 'fuel_critical' | 'altitude_change';
 export type RunwayType = 'short' | 'long' | 'helipad';
 export type GamePhase = 'menu' | 'playing' | 'paused' | 'gameover' | 'levelcomplete';
-export type EventType = 'runway_closed' | 'wind_shear' | 'vip_flight' | 'bird_strike' | 'none';
+export type EventType = 'runway_closed' | 'wind_shear' | 'nordo_flight' | 'bird_strike' | 'none';
 export type PlayerRank =
-  | 'Student Pilot'
-  | 'Private Pilot'
-  | 'CPL'
-  | 'ATPL'
-  | 'Senior Controller'
-  | 'Tower Chief';
+  | '2LT'
+  | '1LT'
+  | 'CAPT'
+  | 'MAJ'
+  | 'LT. COL'
+  | 'COL'
+  | 'BRIG GEN'
+  | 'MAJ. GEN'
+  | 'LT. GEN'
+  | 'GEN';
 
 export interface Vec2 {
   x: number;
@@ -38,12 +42,15 @@ export interface Aircraft {
   maxFuel: number;
   fuelBurnRate: number;    // units/sec
   isEmergency: boolean;
-  isVIP: boolean;
+  isNORDO: boolean;
   callsign: string;
   color: string;
   holdingCenter: Vec2 | null;
   holdingAngle: number;
   spawnTime: number;
+  landedTime?: number;
+  altitude: 1 | 2 | 3;
+  targetAltitude: 1 | 2 | 3;
 }
 
 export interface Runway {
@@ -90,7 +97,7 @@ export interface GameEvent {
   payload?: {
     runwayId?: string;
     windDelta?: number;
-    vipAircraftId?: string;
+    nordoAircraftId?: string;
     birdStrikeZone?: { center: Vec2; radius: number };
   };
 }
@@ -100,6 +107,13 @@ export interface ComboState {
   multiplier: number;
   lastLandingTime: number;
   timeoutMs: number;
+}
+
+export interface ScorePopup {
+  id: string;
+  position: Vec2;
+  score: number;
+  createdAt: number;
 }
 
 export interface GameState {
@@ -122,7 +136,15 @@ export interface GameState {
   selectedAircraftId: string | null;
   drawingPath: Vec2[];
   isDrawing: boolean;
+  scorePopups: ScorePopup[];
+  screenShakeUntil?: number;
+  invulnerableUntil?: number;
   gameOverReason?: 'collision' | 'fuel' | 'vip_delay';
+  levelStats: {
+    perfectLandings: number;
+    fastestLanding: number;
+    totalTimeBonuses: number;
+  };
 }
 
 export interface RankConfig {

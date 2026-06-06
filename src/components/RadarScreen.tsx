@@ -15,6 +15,7 @@ interface RadarScreenProps {
   onPathDrawn: (aircraftId: string, path: Vec2[]) => void;
   onAircraftSelected: (id: string | null) => void;
   onHoldingToggle: (aircraftId: string) => void;
+  onAltitudeChange: (aircraftId: string, altitude: 1 | 2 | 3) => void;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
 }
 
@@ -23,6 +24,7 @@ export default function RadarScreen({
   onPathDrawn,
   onAircraftSelected,
   onHoldingToggle,
+  onAltitudeChange,
   onCanvasReady,
 }: RadarScreenProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -69,7 +71,7 @@ export default function RadarScreen({
   // ── Hit-test: find aircraft near a point ──────────────────
   const findAircraftAt = useCallback((pos: Vec2): Aircraft | null => {
     const state = gameStateRef.current;
-    const HIT_RADIUS = 28;
+    const HIT_RADIUS = 45;
     for (const ac of state.aircraft) {
       if (ac.state === 'landed' || ac.state === 'crashed') continue;
       if (vecDist(pos, ac.position) < HIT_RADIUS) return ac;
@@ -89,9 +91,30 @@ export default function RadarScreen({
     const state = gameStateRef.current;
     if (state.phase !== 'playing') return;
     const pos = getPos(e);
+
+    if (state.selectedAircraftId && state.level >= 4) {
+      const selectedAc = state.aircraft.find(a => a.id === state.selectedAircraftId);
+      if (selectedAc) {
+        const stats = AIRCRAFT_STATS[selectedAc.type];
+        const startX = selectedAc.position.x + stats.size + 15;
+        const startY = selectedAc.position.y - 40;
+        const btnW = 40;
+        const btnH = 20;
+        
+        for (let i = 0; i < 3; i++) {
+          const alt = (3 - i) as 1 | 2 | 3;
+          const y = startY + i * (btnH + 5);
+          if (pos.x >= startX && pos.x <= startX + btnW && pos.y >= y && pos.y <= y + btnH) {
+            onAltitudeChange(selectedAc.id, alt);
+            return;
+          }
+        }
+      }
+    }
+
     const ac = findAircraftAt(pos);
 
-    if (ac) {
+    if (ac && !ac.isNORDO) {
       // Double-click = toggle holding
       const now = Date.now();
       if (lastTapRef.current.id === ac.id && now - lastTapRef.current.time < 350) {
@@ -107,7 +130,7 @@ export default function RadarScreen({
       onAircraftSelected(null);
       drawingRef.current = { active: false, points: [], aircraftId: null };
     }
-  }, [gameStateRef, findAircraftAt, getPos, onAircraftSelected, onHoldingToggle]);
+  }, [gameStateRef, findAircraftAt, getPos, onAircraftSelected, onHoldingToggle, onAltitudeChange]);
 
   const onMouseMove = useCallback((e: MouseEvent) => {
     if (!drawingRef.current.active) return;
@@ -140,9 +163,30 @@ export default function RadarScreen({
     if (state.phase !== 'playing') return;
     const touch = e.touches[0];
     const pos = getPos(touch);
+
+    if (state.selectedAircraftId && state.level >= 4) {
+      const selectedAc = state.aircraft.find(a => a.id === state.selectedAircraftId);
+      if (selectedAc) {
+        const stats = AIRCRAFT_STATS[selectedAc.type];
+        const startX = selectedAc.position.x + stats.size + 15;
+        const startY = selectedAc.position.y - 40;
+        const btnW = 40;
+        const btnH = 20;
+        
+        for (let i = 0; i < 3; i++) {
+          const alt = (3 - i) as 1 | 2 | 3;
+          const y = startY + i * (btnH + 5);
+          if (pos.x >= startX && pos.x <= startX + btnW && pos.y >= y && pos.y <= y + btnH) {
+            onAltitudeChange(selectedAc.id, alt);
+            return;
+          }
+        }
+      }
+    }
+
     const ac = findAircraftAt(pos);
 
-    if (ac) {
+    if (ac && !ac.isNORDO) {
       const now = Date.now();
       if (lastTapRef.current.id === ac.id && now - lastTapRef.current.time < 350) {
         onHoldingToggle(ac.id);
@@ -153,7 +197,7 @@ export default function RadarScreen({
       drawingRef.current = { active: true, points: [pos], aircraftId: ac.id };
       onAircraftSelected(ac.id);
     }
-  }, [gameStateRef, findAircraftAt, getPos, onAircraftSelected, onHoldingToggle]);
+  }, [gameStateRef, findAircraftAt, getPos, onAircraftSelected, onHoldingToggle, onAltitudeChange]);
 
   const onTouchMove = useCallback((e: TouchEvent) => {
     e.preventDefault();
@@ -221,6 +265,13 @@ export function renderFrame(state: GameState, canvas: HTMLCanvasElement): void {
   const config = LEVELS[state.level - 1] ?? LEVELS[0];
 
   // ── Background ────────────────────────────────────────────
+  ctx.save();
+  if (state.screenShakeUntil && now < state.screenShakeUntil) {
+    const shakeX = (Math.random() - 0.5) * 10;
+    const shakeY = (Math.random() - 0.5) * 10;
+    ctx.translate(shakeX, shakeY);
+  }
+
   ctx.fillStyle = COLORS.BG_DEEP;
   ctx.fillRect(0, 0, W, H);
 
@@ -277,13 +328,40 @@ export function renderFrame(state: GameState, canvas: HTMLCanvasElement): void {
 
   // ── Aircraft ──────────────────────────────────────────────
   for (const ac of state.aircraft) {
-    if (ac.state === 'landed') continue;
+    if (ac.state === 'landed') {
+      if (ac.landedTime) {
+        const elapsed = now - ac.landedTime;
+        if (elapsed < 3000) {
+          const alpha = 1 - elapsed / 3000;
+          const scale = 1 - elapsed / 3000;
+          drawAircraft(ctx, ac, state, alpha, null, scale);
+        }
+      }
+      continue;
+    }
     const { alpha, colorOverride } = getPhosphorState(ac, state, W, H);
-    drawAircraft(ctx, ac, state, alpha, colorOverride);
+    drawAircraft(ctx, ac, state, alpha, colorOverride, 1);
+  }
+
+  // ── Score Popups ──────────────────────────────────────────
+  for (const popup of state.scorePopups ?? []) {
+    const elapsed = now - popup.createdAt;
+    const alpha = 1 - elapsed / 1500;
+    const floatY = popup.position.y - (elapsed / 1500) * 30;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = 'bold 18px "JetBrains Mono"';
+    ctx.fillStyle = COLORS.HUD_GOLD;
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(255, 215, 0, 0.8)';
+    ctx.shadowBlur = 8;
+    ctx.fillText(`+${popup.score}`, popup.position.x, floatY);
+    ctx.restore();
   }
 
   // ── Scanlines overlay (CRT aesthetic) ────────────────────
   drawScanlines(ctx, W, H);
+  ctx.restore(); // Restore screen shake translation
 }
 
 // ── Grid ─────────────────────────────────────────────────────
@@ -471,21 +549,25 @@ function drawAircraft(
   ac: Aircraft,
   state: GameState,
   alpha: number,
-  colorOverride: string | null
+  colorOverride: string | null,
+  scale: number = 1
 ) {
   if (alpha <= 0) return;
   const stats = AIRCRAFT_STATS[ac.type];
-  const color = colorOverride || getAircraftColor(ac.type, ac.isEmergency, ac.isVIP);
+  const color = colorOverride || getAircraftColor(ac.type, ac.isEmergency, ac.isNORDO);
   const selected = state.selectedAircraftId === ac.id;
 
   // Check separation warnings
   const otherAircraft = state.aircraft.filter((o) => o.id !== ac.id && o.state !== 'landed' && o.state !== 'crashed');
-  const hasWarning = otherAircraft.some((o) => isSeparationViolated(ac, o));
+  const hasWarning = otherAircraft.some(
+    (o) => o.altitude === ac.altitude && isSeparationViolated(ac, o)
+  );
   const ringStatus = hasWarning ? 'warning' : 'none';
 
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.translate(ac.position.x, ac.position.y);
+  ctx.scale(scale, scale);
 
   // ── Separation ring ────────────────────────────────────────
   ctx.beginPath();
@@ -495,6 +577,16 @@ function drawAircraft(
   ctx.strokeStyle = getRingColor(ringStatus);
   ctx.lineWidth = hasWarning ? 2 : 1;
   ctx.stroke();
+
+  // ── Fuel Pulse Ring ────────────────────────────────────────
+  if (ac.fuel <= 20 && ac.state !== 'landed') {
+    const pulse = 0.5 + 0.5 * Math.sin(Date.now() / (ac.fuel > 0 ? 100 : 50));
+    ctx.beginPath();
+    ctx.arc(0, 0, stats.size * 1.5, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255, 0, 60, ${pulse})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
 
   // ── Holding ring ───────────────────────────────────────────
   if (ac.state === 'holding' && ac.holdingCenter) {
@@ -539,7 +631,7 @@ function drawAircraft(
   drawFuelBar(ctx, ac, stats.size, colorOverride);
 
   // ── Emergency / VIP badge ──────────────────────────────────
-  if (ac.isEmergency || ac.isVIP) {
+  if (ac.isEmergency || ac.isNORDO) {
     const timeInAir = Date.now() - ac.spawnTime;
     
     // Calculate allowed time based on distance to nearest runway
@@ -551,8 +643,9 @@ function drawAircraft(
       if (dist < minDistance) minDistance = dist;
     }
     
-    // Base 60s + up to 30s based on distance
-    const allowedTimeMs = 60000 + (Math.min(minDistance, 800) / 800) * 30000;
+    // Base time 50s (Emergency) / 60s (VIP) + up to 30s based on distance
+    const baseTime = ac.isEmergency ? 50000 : 60000;
+    const allowedTimeMs = baseTime + (Math.min(minDistance, 800) / 800) * 30000;
     const timeLeft = Math.max(0, Math.ceil((allowedTimeMs - timeInAir) / 1000));
     const timerText = `${timeLeft}s`;
 
@@ -565,14 +658,47 @@ function drawAircraft(
       ctx.shadowBlur = 8;
       ctx.fillText(`⚠ MAYDAY [${timerText}]`, 0, -stats.size - 16);
       ctx.shadowBlur = 0;
-    } else if (ac.isVIP) {
+    } else if (ac.isNORDO) {
       ctx.font = 'bold 14px "JetBrains Mono","Courier New",monospace';
       ctx.fillStyle = colorOverride || COLORS.HUD_GOLD;
       ctx.textAlign = 'center';
       ctx.shadowColor = colorOverride ? 'rgba(255,255,255,0.65)' : 'rgba(255,215,0,0.7)';
       ctx.shadowBlur = 6;
-      ctx.fillText(`★ VIP [${timerText}]`, 0, -stats.size - 16);
+      ctx.fillText(`★ NORDO [${timerText}]`, 0, -stats.size - 16);
       ctx.shadowBlur = 0;
+    }
+  }
+
+  // ── Altitude Menu (Level 4+) ───────────────────────────────
+  if (state.level >= 4) {
+    if (selected) {
+      const options = [3, 2, 1];
+      const btnW = 40;
+      const btnH = 20;
+      const startX = stats.size + 15;
+      const startY = -40;
+
+      ctx.font = 'bold 12px "JetBrains Mono"';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      options.forEach((alt, i) => {
+        const y = startY + i * (btnH + 5);
+        ctx.fillStyle = ac.targetAltitude === alt ? 'rgba(0, 240, 255, 0.8)' : 'rgba(11, 19, 43, 0.8)';
+        ctx.strokeStyle = ac.targetAltitude === alt ? '#fff' : '#00F0FF';
+        ctx.lineWidth = 1.5;
+        ctx.fillRect(startX, y, btnW, btnH);
+        ctx.strokeRect(startX, y, btnW, btnH);
+
+        ctx.fillStyle = ac.targetAltitude === alt ? '#000' : '#00F0FF';
+        ctx.fillText(`FL${alt}`, startX + btnW / 2, y + btnH / 2);
+      });
+    } else {
+      // Just show current altitude
+      ctx.font = 'bold 12px "JetBrains Mono"';
+      ctx.fillStyle = colorOverride || '#00F0FF';
+      ctx.textAlign = 'left';
+      ctx.fillText(`FL${ac.altitude}`, stats.size + 8, -stats.size - 8);
     }
   }
 

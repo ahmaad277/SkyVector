@@ -1,7 +1,7 @@
 import type { GameEvent, EventType, GameState } from '../types/game.types';
 import { randomBetween, randomIntBetween } from '../utils/pathMath';
 
-const EVENT_INTERVAL_MS = 90_000;    // 90 seconds between events
+const EVENT_INTERVAL_MS = 30_000;    // 30 seconds between events
 const EVENT_DURATION_MS = 20_000;    // most events last 20 seconds
 
 export function shouldTriggerEvent(state: GameState, now: number): boolean {
@@ -11,7 +11,7 @@ export function shouldTriggerEvent(state: GameState, now: number): boolean {
 }
 
 export function generateEvent(state: GameState, now: number): GameEvent {
-  const eligible: EventType[] = ['wind_shear', 'vip_flight', 'bird_strike'];
+  const eligible: EventType[] = ['wind_shear', 'nordo_flight', 'bird_strike'];
   // Runway close only if we have multiple runways
   if (state.runways.length >= 2) eligible.push('runway_closed');
 
@@ -54,7 +54,7 @@ export function generateEvent(state: GameState, now: number): GameEvent {
       event.duration = 20_000;
       break;
     }
-    case 'vip_flight': {
+    case 'nordo_flight': {
       event.duration = 30_000;
       break;
     }

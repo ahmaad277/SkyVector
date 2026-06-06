@@ -11,17 +11,21 @@ import {
 import type { DailyMission, PlayerProfile, PlayerRank } from '../types/game.types';
 
 const RANK_THRESHOLDS: Record<PlayerRank, number> = {
-  'Student Pilot':     0,
-  'Private Pilot':     500,
-  'CPL':               2000,
-  'ATPL':              6000,
-  'Senior Controller': 15000,
-  'Tower Chief':       40000,
+  '2LT':       0,
+  '1LT':       500,
+  'CAPT':      1500,
+  'MAJ':       3000,
+  'LT. COL':   6000,
+  'COL':       10000,
+  'BRIG GEN':  15000,
+  'MAJ. GEN':  22000,
+  'LT. GEN':   32000,
+  'GEN':       50000,
 };
 
 function xpToRank(xp: number): PlayerRank {
   const ranks = Object.entries(RANK_THRESHOLDS) as [PlayerRank, number][];
-  let current: PlayerRank = 'Student Pilot';
+  let current: PlayerRank = '2LT';
   for (const [rank, min] of ranks) {
     if (xp >= min) current = rank;
   }
@@ -40,7 +44,7 @@ function loadLocalProfile(): PlayerProfile {
   return {
     id: `guest-${Date.now()}`,
     username: `CTRL-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`,
-    rank: 'Student Pilot',
+    rank: '2LT',
     totalXP: 0,
     bestScore: 0,
     gamesPlayed: 0,

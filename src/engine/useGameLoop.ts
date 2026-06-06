@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import type { GameState, LevelConfig } from '../types/game.types';
 import { updateAircraft } from '../entities/Aircraft';
 import { spawnAircraft } from '../entities/AircraftFactory';
-import { checkCollisions, checkLandings, updateCombo } from './CollisionEngine';
+import { checkCollisions, checkLandings, updateCombo, checkBirdStrike } from './CollisionEngine';
 import {
   shouldTriggerEvent,
   generateEvent,
@@ -21,7 +21,7 @@ interface UseGameLoopOptions {
   onGameOver: (finalScore: number, maxCombo: number, reason: 'collision' | 'fuel' | 'vip_delay') => void;
   onLevelComplete: (level: number) => void;
   onEventTriggered: (event: GameState['activeEvent']) => void;
-  onLanding: (callsign: string, isVIP: boolean, isEmergency: boolean) => void;
+  onLanding: (callsign: string, isNORDO: boolean, isEmergency: boolean) => void;
   renderFrame: (state: GameState, canvas: HTMLCanvasElement) => void;
 }
 
@@ -84,12 +84,19 @@ export function useGameLoop(options: UseGameLoopOptions) {
       ) {
         const newAc = spawnAircraft(config, canvas.width, canvas.height);
         if (newAc) {
-          // If VIP, mark it in state
-          if (newAc.isVIP && newState.activeEvent?.type === 'vip_flight') {
-            newState.aircraft = [...newState.aircraft, newAc];
-          } else {
-            newState.aircraft = [...newState.aircraft, newAc];
+          if (newAc.isNORDO) {
+            const validRunways = config.runways.filter((r) => {
+              if (newAc.type === 'helicopter') return r.type === 'helipad';
+              if (newAc.type === 'cessna')     return r.type === 'short' || r.type === 'long';
+              return r.type === 'long';
+            });
+            if (validRunways.length > 0) {
+              const targetRunway = validRunways[Math.floor(Math.random() * validRunways.length)];
+              newAc.path = [newAc.position, targetRunway.position];
+              newAc.targetRunwayId = targetRunway.id;
+            }
           }
+          newState.aircraft = [...newState.aircraft, newAc];
         }
         lastSpawnRef.current = now;
       }
@@ -100,18 +107,28 @@ export function useGameLoop(options: UseGameLoopOptions) {
       );
 
       // ── Check for fuel crashes and VIP/Mayday delays ────────
-      const fuelCrashed = newState.aircraft.find(a => a.state === 'crashed');
+      const isInvulnerable = newState.invulnerableUntil ? now < newState.invulnerableUntil : false;
+
+      const fuelCrashed = newState.aircraft.find(a => a.state === 'crashed' && a.fuel <= 0);
       if (fuelCrashed) {
-        isRunningRef.current = false;
-        gameStateRef.current = { ...newState, phase: 'gameover', gameOverReason: 'fuel' };
-        renderFrame(gameStateRef.current, canvas);
-        onGameOver(newState.score, maxComboRef.current, 'fuel');
-        return;
+        if (!isInvulnerable) {
+          newState.lives -= 1;
+          if (newState.lives <= 0) {
+            isRunningRef.current = false;
+            gameStateRef.current = { ...newState, phase: 'gameover', gameOverReason: 'fuel' };
+            renderFrame(gameStateRef.current, canvas);
+            onGameOver(newState.score, maxComboRef.current, 'fuel');
+            return;
+          } else {
+            newState.invulnerableUntil = now + 2000;
+          }
+        }
+        // Remove the crashed aircraft so it doesn't keep triggering
+        newState.aircraft = newState.aircraft.filter(a => a.id !== fuelCrashed.id);
       }
 
       const delayedVIPOrMayday = newState.aircraft.find(a => {
-        if ((a.isVIP || a.isEmergency) && a.state !== 'landed' && a.state !== 'crashed') {
-          // Calculate distance to nearest runway
+        if ((a.isNORDO || a.isEmergency) && a.state !== 'landed' && a.state !== 'crashed') {
           let minDistance = Infinity;
           for (const runway of newState.runways) {
             const dx = a.position.x - runway.position.x;
@@ -119,23 +136,27 @@ export function useGameLoop(options: UseGameLoopOptions) {
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < minDistance) minDistance = dist;
           }
-          
-          // Base time 60s + up to 30s extra based on distance from nearest runway
-          const allowedTimeMs = 60000 + (Math.min(minDistance, 800) / 800) * 30000;
+          const baseTime = a.isEmergency ? 50000 : 60000;
+          const allowedTimeMs = baseTime + (Math.min(minDistance, 800) / 800) * 30000;
           return (now - a.spawnTime > allowedTimeMs);
         }
         return false;
       });
 
       if (delayedVIPOrMayday) {
-        newState.aircraft = newState.aircraft.map(a => 
-          a.id === delayedVIPOrMayday.id ? { ...a, state: 'crashed' } : a
-        );
-        isRunningRef.current = false;
-        gameStateRef.current = { ...newState, phase: 'gameover', gameOverReason: 'vip_delay' };
-        renderFrame(gameStateRef.current, canvas);
-        onGameOver(newState.score, maxComboRef.current, 'vip_delay');
-        return;
+        if (!isInvulnerable) {
+          newState.lives -= 1;
+          if (newState.lives <= 0) {
+            isRunningRef.current = false;
+            gameStateRef.current = { ...newState, phase: 'gameover', gameOverReason: 'vip_delay' };
+            renderFrame(gameStateRef.current, canvas);
+            onGameOver(newState.score, maxComboRef.current, 'vip_delay');
+            return;
+          } else {
+            newState.invulnerableUntil = now + 2000;
+          }
+        }
+        newState.aircraft = newState.aircraft.filter(a => a.id !== delayedVIPOrMayday.id);
       }
 
       // ── 4. Collision & out-of-bounds check ────────────────
@@ -149,14 +170,25 @@ export function useGameLoop(options: UseGameLoopOptions) {
       );
 
       if (collision && colliderIds) {
-        newState.aircraft = newState.aircraft.map((a) =>
-          colliderIds.includes(a.id) ? { ...a, state: 'crashed' } : a
-        );
-        isRunningRef.current = false;
-        gameStateRef.current = { ...newState, phase: 'gameover', gameOverReason: 'collision' };
-        renderFrame(gameStateRef.current, canvas);
-        onGameOver(newState.score, maxComboRef.current, 'collision');
-        return;
+        if (!isInvulnerable) {
+          newState.lives -= 1;
+          newState.collisions += 1;
+          newState.screenShakeUntil = now + 300;
+          if (newState.lives <= 0) {
+            newState.aircraft = newState.aircraft.map((a) =>
+              colliderIds.includes(a.id) ? { ...a, state: 'crashed' } : a
+            );
+            isRunningRef.current = false;
+            gameStateRef.current = { ...newState, phase: 'gameover', gameOverReason: 'collision' };
+            renderFrame(gameStateRef.current, canvas);
+            onGameOver(newState.score, maxComboRef.current, 'collision');
+            return;
+          } else {
+            newState.invulnerableUntil = now + 2000;
+          }
+        }
+        // Remove collided aircraft so they don't keep colliding
+        newState.aircraft = newState.aircraft.filter(a => !colliderIds.includes(a.id));
       }
 
       // Remove out-of-bounds aircraft silently
@@ -181,11 +213,25 @@ export function useGameLoop(options: UseGameLoopOptions) {
 
         const ac = newState.aircraft.find((a) => a.id === result.aircraftId);
         if (ac) {
-          onLanding(ac.callsign, result.isVIP, result.isEmergency);
+          onLanding(ac.callsign, result.isNORDO, result.isEmergency);
+          if (!newState.scorePopups) newState.scorePopups = [];
+          newState.scorePopups.push({
+            id: `popup-${Date.now()}-${Math.random()}`,
+            position: { ...ac.position },
+            score: multiplied,
+            createdAt: now,
+          });
+          
+          if (result.perfectBonus > 0) newState.levelStats.perfectLandings++;
+          if (result.timeBonus > 0) newState.levelStats.totalTimeBonuses += result.timeBonus;
+          const timeInAir = now - ac.spawnTime;
+          if (timeInAir < newState.levelStats.fastestLanding) {
+            newState.levelStats.fastestLanding = timeInAir;
+          }
         }
 
         newState.aircraft = newState.aircraft.map((a) =>
-          a.id === result.aircraftId ? { ...a, state: 'landed' } : a
+          a.id === result.aircraftId ? { ...a, state: 'landed', landedTime: now } : a
         );
         newState.totalLandings += 1;
       }
@@ -208,12 +254,47 @@ export function useGameLoop(options: UseGameLoopOptions) {
         const event = generateEvent(newState, now);
         newState = applyEventToState(newState, event);
         onEventTriggered(newState.activeEvent);
+        
+        if (event.type === 'nordo_flight') {
+          const newAc = spawnAircraft(config, canvas.width, canvas.height, true);
+          if (newAc) {
+            const validRunways = config.runways.filter((r) => {
+              if (newAc.type === 'helicopter') return r.type === 'helipad';
+              if (newAc.type === 'cessna')     return r.type === 'short' || r.type === 'long';
+              return r.type === 'long';
+            });
+            if (validRunways.length > 0) {
+              const targetRunway = validRunways[Math.floor(Math.random() * validRunways.length)];
+              newAc.path = [newAc.position, targetRunway.position];
+              newAc.targetRunwayId = targetRunway.id;
+            }
+            newState.aircraft = [...newState.aircraft, newAc];
+          }
+        }
       }
 
-      // ── 7. Clean up landed / crashed aircraft ─────────────
+      // ── 6.5 Bird Strike Check ─────────────────────────────
+      if (newState.activeEvent?.type === 'bird_strike' && newState.activeEvent.payload?.birdStrikeZone) {
+        const struckIds = checkBirdStrike(newState.aircraft, newState.activeEvent.payload.birdStrikeZone);
+        if (struckIds.length > 0) {
+          newState.aircraft = newState.aircraft.map(a => {
+            if (struckIds.includes(a.id) && !a.isEmergency) {
+              return {
+                ...a,
+                isEmergency: true,
+                fuelBurnRate: a.fuelBurnRate * 1.5
+              };
+            }
+            return a;
+          });
+        }
+      }
+
+      // ── 7. Clean up landed / crashed aircraft and popups ─────────────
       newState.aircraft = newState.aircraft.filter(
-        (a) => a.state !== 'landed' || Date.now() - a.spawnTime < 3000
+        (a) => a.state !== 'landed' || (a.landedTime && now - a.landedTime < 3000)
       );
+      newState.scorePopups = (newState.scorePopups ?? []).filter(p => now - p.createdAt < 1500);
 
       // ── 8. Level complete check ───────────────────────────
       if (newState.totalLandings >= getLandingTargetForLevel(newState.level) && newState.level < LEVELS.length) {
@@ -293,5 +374,11 @@ export function createInitialGameState(level: number): GameState {
     selectedAircraftId: null,
     drawingPath: [],
     isDrawing: false,
+    scorePopups: [],
+    levelStats: {
+      perfectLandings: 0,
+      fastestLanding: Infinity,
+      totalTimeBonuses: 0,
+    },
   };
 }

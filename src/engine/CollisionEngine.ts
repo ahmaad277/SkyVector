@@ -41,6 +41,7 @@ export function checkCollisions(
     for (let j = i + 1; j < aircraft.length; j++) {
       const b = aircraft[j];
       if (b.state === 'landed' || b.state === 'crashed') continue;
+      if (a.altitude !== b.altitude) continue; // No collision if at different altitudes
 
       if (isCollision(a, b)) {
         return {
@@ -66,7 +67,9 @@ export interface LandingResult {
   runwayId: string;
   scoreGain: number;
   isEmergency: boolean;
-  isVIP: boolean;
+  isNORDO: boolean;
+  timeBonus: number;
+  perfectBonus: number;
 }
 
 export function checkLandings(
@@ -80,6 +83,7 @@ export function checkLandings(
 
   for (const ac of aircraft) {
     if (ac.state === 'landed' || ac.state === 'crashed' || !ac.targetAirportId) continue;
+    if (ac.altitude !== 1) continue; // Must be at FL1 to land
 
     const airportRunways = runways.filter(
       (r) =>
@@ -97,7 +101,7 @@ export function checkLandings(
       for (const runway of airportRunways) {
         const dist = vecDist(ac.position, runway.position);
         if (dist < stats.landingDistance) {
-          results.push(buildLandingResult(ac, runway.id));
+          results.push(buildLandingResult(ac, runway.id, now, 0));
           break;
         }
       }
@@ -117,7 +121,11 @@ export function checkLandings(
       const distToThreshold = vecDist(ac.position, threshold);
 
       if (distToThreshold < stats.landingDistance) {
-        results.push(buildLandingResult(ac, runway.id));
+        // Calculate angle deviation for perfect landing bonus
+        let angleDiff = Math.abs(ac.heading - activeHeading);
+        if (angleDiff > 180) angleDiff = 360 - angleDiff;
+        
+        results.push(buildLandingResult(ac, runway.id, now, angleDiff));
         break;
       }
     }
@@ -132,16 +140,32 @@ function acceptsAircraft(runway: Runway, ac: Aircraft): boolean {
   return runway.type === 'long';
 }
 
-function buildLandingResult(ac: Aircraft, runwayId: string): LandingResult {
+function buildLandingResult(ac: Aircraft, runwayId: string, now: number, angleDiff: number): LandingResult {
   let score = 100;
   if (ac.isEmergency) score += 50;
-  if (ac.isVIP) score *= 10;
+  if (ac.isNORDO) score *= 10;
+  
+  let timeBonus = 0;
+  const timeInAir = now - ac.spawnTime;
+  if (timeInAir < 30000) {
+    timeBonus = Math.floor((30000 - timeInAir) / 1000) * 2; // up to 60 points
+    score += timeBonus;
+  }
+  
+  let perfectBonus = 0;
+  if (ac.type !== 'helicopter' && angleDiff < 5) {
+    perfectBonus = 25;
+    score += perfectBonus;
+  }
+  
   return {
     aircraftId: ac.id,
     runwayId,
     scoreGain: score,
     isEmergency: ac.isEmergency,
-    isVIP: ac.isVIP,
+    isNORDO: ac.isNORDO,
+    timeBonus,
+    perfectBonus,
   };
 }
 

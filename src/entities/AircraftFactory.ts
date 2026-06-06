@@ -20,7 +20,8 @@ function weightedRandom(weights: Record<AircraftType, number>): AircraftType {
 export function spawnAircraft(
   config: LevelConfig,
   canvasWidth: number,
-  canvasHeight: number
+  canvasHeight: number,
+  forceNORDO = false
 ) {
   const type = weightedRandom(config.typeWeights);
 
@@ -38,8 +39,11 @@ export function spawnAircraft(
 
   // ~8% emergency, ~4% VIP (not both)
   const roll = Math.random();
-  const isEmergency = roll < 0.08;
-  const isVIP = !isEmergency && roll > 0.96;
+  const isEmergency = !forceNORDO && roll < 0.08;
+  const isNORDO = forceNORDO || (!isEmergency && roll > 0.96);
+  
+  // Altitude: level >= 4 uses FL1/FL2/FL3. Spawn at FL3 usually.
+  const altitude = config.id >= 4 ? (Math.random() > 0.5 ? 3 : 2) : 1;
 
   return createAircraft(
     type,
@@ -48,6 +52,7 @@ export function spawnAircraft(
     config.airport.id,
     null,
     isEmergency,
-    isVIP
+    isNORDO,
+    altitude as 1 | 2 | 3
   );
 }

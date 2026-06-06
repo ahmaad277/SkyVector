@@ -86,7 +86,8 @@ export function createAircraft(
   targetAirportId: string,
   targetRunwayId: string | null = null,
   isEmergency = false,
-  isVIP = false
+  isNORDO = false,
+  altitude: 1 | 2 | 3 = 1
 ): Aircraft {
   const stats = AIRCRAFT_STATS[type];
   const callsigns: Record<AircraftType, string[]> = {
@@ -96,8 +97,8 @@ export function createAircraft(
     helicopter: ['HELO-A', 'HELO-B', 'MEDEVAC', 'COAST-1', 'ARMY-H'],
   };
   const signs = callsigns[type];
-  const callsign = isVIP
-    ? 'VIP-ONE'
+  const callsign = isNORDO
+    ? 'NORDO-ONE'
     : signs[_idCounter % signs.length];
 
   _idCounter++;
@@ -122,12 +123,14 @@ export function createAircraft(
     maxFuel: stats.fuelMax,
     fuelBurnRate: isEmergency ? stats.fuelBurnRate * 1.5 : stats.fuelBurnRate,
     isEmergency,
-    isVIP,
+    isNORDO,
     callsign,
     color: '',  // resolved dynamically in renderer
     holdingCenter: null,
     holdingAngle: heading,
     spawnTime: Date.now(),
+    altitude,
+    targetAltitude: altitude,
   };
 }
 
@@ -142,6 +145,18 @@ export function updateAircraft(
 
   // Burn fuel
   const newFuel = Math.max(0, ac.fuel - ac.fuelBurnRate * dt);
+  // Altitude change
+  let newAltitude = ac.altitude;
+  if (ac.targetAltitude !== ac.altitude) {
+    // Change by 1 level every 1 second
+    // Since altitude is 1|2|3, we can just change it if enough time passed.
+    // But we don't have a timer. Let's just change it instantly for simplicity,
+    // or add a small chance to change it per frame?
+    // Actually, let's just make it instant for now, or add a field.
+    // Let's just set it instantly.
+    newAltitude = ac.targetAltitude;
+  }
+
   const newState = newFuel <= 0 && ac.state !== 'landing'
     ? 'crashed'
     : newFuel <= 20
@@ -151,22 +166,23 @@ export function updateAircraft(
     : ac.state;
 
   if (ac.state === 'holding' && ac.holdingCenter) {
-    return updateHolding(ac, dt, newFuel, newState);
+    return updateHolding(ac, dt, newFuel, newState, newAltitude);
   }
 
   if (ac.path.length >= 2 && ac.state !== 'landing') {
-    return updateFollowPath(ac, dt, newFuel, newState, windDir, windStrength);
+    return updateFollowPath(ac, dt, newFuel, newState, windDir, windStrength, newAltitude);
   }
 
   // Free-flight (no path assigned): continue on current heading
-  return updateFreeFlight(ac, dt, newFuel, newState, windDir, windStrength);
+  return updateFreeFlight(ac, dt, newFuel, newState, windDir, windStrength, newAltitude);
 }
 
 function updateHolding(
   ac: Aircraft,
   dt: number,
   newFuel: number,
-  newState: Aircraft['state']
+  newState: Aircraft['state'],
+  newAltitude: 1 | 2 | 3
 ): Aircraft {
   const HOLDING_RADIUS = 35;
   // Natural speed: angular velocity = (linear speed / radius)
@@ -182,6 +198,7 @@ function updateHolding(
     heading: newHeading,
     holdingAngle: newAngle % 360,
     fuel: newFuel,
+    altitude: newAltitude,
     state: newState === ac.state ? 'holding' : newState,
     velocity: {
       x: Math.cos(headingToAngle(newHeading)) * ac.speed,
@@ -196,7 +213,8 @@ function updateFollowPath(
   newFuel: number,
   newState: Aircraft['state'],
   windDir: number,
-  windStrength: number
+  windStrength: number,
+  newAltitude: 1 | 2 | 3
 ): Aircraft {
   const stats = AIRCRAFT_STATS[ac.type];
   const totalLen = pathLength(ac.path);
@@ -218,6 +236,7 @@ function updateFollowPath(
       holdingCenter: center,
       holdingAngle: (ac.heading - 90 + 360) % 360,
       fuel: newFuel,
+      altitude: newAltitude,
       velocity: {
         x: Math.cos(headingToAngle(ac.heading)) * ac.speed,
         y: Math.sin(headingToAngle(ac.heading)) * ac.speed,
@@ -282,6 +301,7 @@ function updateFollowPath(
     pathProgress: newProgress,
     heading: newHeading,
     fuel: newFuel,
+    altitude: newAltitude,
     state: newState === ac.state ? ac.state : newState,
     velocity: { x: newVelX, y: newVelY },
   };
@@ -293,7 +313,8 @@ function updateFreeFlight(
   newFuel: number,
   newState: Aircraft['state'],
   windDir: number,
-  windStrength: number
+  windStrength: number,
+  newAltitude: 1 | 2 | 3
 ): Aircraft {
   let vel = { ...ac.velocity };
   if (windStrength > 0) {
@@ -307,6 +328,7 @@ function updateFreeFlight(
     },
     velocity: vel,
     fuel: newFuel,
+    altitude: newAltitude,
     state: newState,
   };
 }

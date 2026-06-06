@@ -1,17 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import type { GameState, GameEvent, PlayerRank } from '../types/game.types';
+import type { GameState, GameEvent, PlayerRank, DailyMission } from '../types/game.types';
 import { COLORS, getComboColor } from '../utils/colorPalette';
 import { LEVELS } from '../levels';
 import { getLandingTargetForLevel } from '../utils/levelProgress';
 
 // ── Rank definitions ─────────────────────────────────────────
 const RANKS: { rank: PlayerRank; minXP: number; color: string; badge: string }[] = [
-  { rank: 'Student Pilot',    minXP: 0,     color: '#888',    badge: '🎓' },
-  { rank: 'Private Pilot',    minXP: 500,   color: '#00FF41', badge: '✈' },
-  { rank: 'CPL',              minXP: 2000,  color: '#00B4D8', badge: '🛩' },
-  { rank: 'ATPL',             minXP: 6000,  color: '#FFA500', badge: '⭐' },
-  { rank: 'Senior Controller',minXP: 15000, color: '#FF003C', badge: '🏆' },
-  { rank: 'Tower Chief',      minXP: 40000, color: '#FFD700', badge: '👑' },
+  { rank: '2LT',      minXP: 0,       color: '#888',    badge: '⭐' },
+  { rank: '1LT',      minXP: 500,     color: '#A0A0A0', badge: '⭐⭐' },
+  { rank: 'CAPT',     minXP: 1500,    color: '#B0B0B0', badge: '⭐⭐⭐' },
+  { rank: 'MAJ',      minXP: 3000,    color: '#C0C0C0', badge: '👑' },
+  { rank: 'LT. COL',  minXP: 6000,    color: '#D0D0D0', badge: '👑⭐' },
+  { rank: 'COL',      minXP: 10000,   color: '#E0E0E0', badge: '👑⭐⭐' },
+  { rank: 'BRIG GEN', minXP: 15000,   color: '#F0E68C', badge: '👑⭐⭐⭐' },
+  { rank: 'MAJ. GEN', minXP: 22000,   color: '#FFD700', badge: '⚔️⭐' },
+  { rank: 'LT. GEN',  minXP: 32000,   color: '#FFA500', badge: '⚔️👑' },
+  { rank: 'GEN',      minXP: 50000,   color: '#FF8C00', badge: '⚔️👑⭐' },
 ];
 
 function getRankInfo(xp: number) {
@@ -39,6 +43,8 @@ interface HUDProps {
   totalXP: number;
   activeEvent: GameEvent | null;
   aircraftCount: number;
+  lives: number;
+  missions: DailyMission[];
   onPause: () => void;
 }
 
@@ -51,6 +57,8 @@ export default function HUD({
   totalXP,
   activeEvent,
   aircraftCount,
+  lives,
+  missions,
   onPause,
 }: HUDProps) {
   const config = LEVELS[level - 1] ?? LEVELS[0];
@@ -61,6 +69,31 @@ export default function HUD({
 
   const [eventAnim, setEventAnim] = useState(false);
   const [landingFlash, setLandingFlash] = useState(false);
+  const [missionPopups, setMissionPopups] = useState<{id: string, text: string}[]>([]);
+  const prevMissionsRef = React.useRef(missions);
+
+  // Track mission completions
+  useEffect(() => {
+    const prev = prevMissionsRef.current;
+    const newlyCompleted = missions.filter(m => 
+      m.completed && !prev.find(p => p.id === m.id)?.completed
+    );
+
+    if (newlyCompleted.length > 0) {
+      const newPopups = newlyCompleted.map(m => ({
+        id: Math.random().toString(),
+        text: `✓ MISSION COMPLETE: ${m.description} (+${m.xpReward} XP)`
+      }));
+      setMissionPopups(prev => [...prev, ...newPopups]);
+
+      newPopups.forEach(p => {
+        setTimeout(() => {
+          setMissionPopups(current => current.filter(x => x.id !== p.id));
+        }, 3000);
+      });
+    }
+    prevMissionsRef.current = missions;
+  }, [missions]);
 
   useEffect(() => {
     if (activeEvent) {
@@ -81,7 +114,7 @@ export default function HUD({
   const eventLabel: Record<string, string> = {
     runway_closed: '⛔ RUNWAY CLOSED',
     wind_shear:    '🌀 WIND SHEAR',
-    vip_flight:    '★ VIP INBOUND',
+    nordo_flight:  '★ NORDO AIRCRAFT INBOUND',
     bird_strike:   '🐦 BIRD STRIKE ZONE',
   };
 
@@ -115,9 +148,9 @@ export default function HUD({
             <div style={{
               position: 'absolute',
               top: '100%',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              marginTop: 4,
+              left: '10%',
+              transform: 'translateX(-30%)',
+              marginTop: 12,
               display: 'flex',
               alignItems: 'center',
               gap: 6,
@@ -148,6 +181,18 @@ export default function HUD({
           <span style={{ ...styles.small, color: COLORS.HUD_DIM }}>
             MAX {config.maxAircraft}
           </span>
+        </div>
+
+        {/* Lives */}
+        <div style={{ ...styles.panel, textAlign: 'center' }}>
+          <span style={styles.label}>LIVES</span>
+          <div style={{ display: 'flex', gap: 4, marginTop: 4, justifyContent: 'center' }}>
+            {[1, 2, 3].map(i => (
+              <span key={i} style={{ fontSize: 18, color: i <= lives ? '#FF003C' : 'rgba(255,0,60,0.2)' }}>
+                ♥
+              </span>
+            ))}
+          </div>
         </div>
 
         {/* Pause */}
@@ -188,6 +233,63 @@ export default function HUD({
         <span style={{ color: COLORS.HUD_DIM, marginLeft: 6, fontSize: 12 }}>
           {totalXP.toLocaleString()} XP
         </span>
+      </div>
+
+      {/* Daily Missions Panel */}
+      <div style={{
+        position: 'absolute',
+        top: 60,
+        right: 10,
+        width: 200,
+        background: 'rgba(11, 19, 43, 0.8)',
+        border: '1px solid rgba(0, 240, 255, 0.3)',
+        borderRadius: 6,
+        padding: 10,
+        pointerEvents: 'auto',
+      }}>
+        <div style={{ fontSize: 12, color: '#00F0FF', fontWeight: 'bold', marginBottom: 8, textAlign: 'center' }}>
+          DAILY MISSIONS
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {missions.map(m => (
+            <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ fontSize: 10, color: m.completed ? '#39FF14' : '#FFF' }}>
+                {m.completed ? '✓ ' : ''}{m.description}
+              </div>
+              <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
+                <div style={{ height: '100%', background: m.completed ? '#39FF14' : '#00F0FF', width: `${Math.min(100, (m.current / m.target) * 100)}%`, borderRadius: 2 }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Mission Popups */}
+      <div style={{
+        position: 'absolute',
+        top: 120,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        pointerEvents: 'none',
+      }}>
+        {missionPopups.map(p => (
+          <div key={p.id} style={{
+            background: 'rgba(57, 255, 20, 0.2)',
+            border: '1px solid #39FF14',
+            color: '#39FF14',
+            padding: '8px 16px',
+            borderRadius: 4,
+            fontWeight: 'bold',
+            fontSize: 14,
+            animation: 'hudEventPulse 0.5s ease',
+            boxShadow: '0 0 10px rgba(57, 255, 20, 0.5)'
+          }}>
+            {p.text}
+          </div>
+        ))}
       </div>
     </div>
   );

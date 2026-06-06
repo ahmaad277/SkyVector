@@ -7,12 +7,13 @@ import StageSelectScreen from './components/StageSelectScreen';
 import GameOverScreen from './components/GameOverScreen';
 import PauseScreen from './components/PauseScreen';
 import Leaderboard from './components/Leaderboard';
+import LevelCompleteScreen from './components/LevelCompleteScreen';
 import { useGameLoop, createInitialGameState } from './engine/useGameLoop';
 import { useAudio } from './hooks/useAudio';
 import { useSupabase } from './hooks/useSupabase';
 import { simplifyPath, smoothPath, findClosestForwardProgress } from './utils/pathMath';
 
-type AppScreen = 'menu' | 'stage_select' | 'game' | 'gameover' | 'leaderboard';
+type AppScreen = 'menu' | 'stage_select' | 'game' | 'gameover' | 'leaderboard' | 'levelcomplete';
 
 export default function App() {
   // ── UI state (React) ─────────────────────────────────────
@@ -29,9 +30,6 @@ export default function App() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [sessionStart, setSessionStart] = useState(Date.now());
-  const [highScore, setHighScore] = useState(() =>
-    parseInt(localStorage.getItem('skyvector_highscore') ?? '0', 10)
-  );
   const [unlockedLevel, setUnlockedLevel] = useState(() =>
     parseInt(localStorage.getItem('skyvector_unlocked') ?? '1', 10)
   );
@@ -39,6 +37,19 @@ export default function App() {
   // ── Mutable game state (no re-renders during game loop) ──
   const gameStateRef = useRef<GameState>(createInitialGameState(1));
   const maxComboRef = useRef(1);
+
+  const [highScores, setHighScores] = useState<Record<number, number>>(() => {
+    const saved = localStorage.getItem('skyvector_highscores');
+    if (saved) return JSON.parse(saved);
+    // Fallback to old global highscore for level 1
+    const old = parseInt(localStorage.getItem('skyvector_highscore') ?? '0', 10);
+    return { 1: old };
+  });
+
+  const [currentLevel, setCurrentLevel] = useState(1);
+  const [lives, setLives] = useState(3);
+  const [totalLandings, setTotalLandings] = useState(0);
+  const highScore = highScores[currentLevel] || 0;
 
   // ── Hooks ────────────────────────────────────────────────
   const { play } = useAudio();
@@ -53,6 +64,9 @@ export default function App() {
         (a) => a.state !== 'landed' && a.state !== 'crashed'
       ).length;
       setAircraftCount(active);
+      setCurrentLevel(state.level);
+      setLives(state.lives);
+      setTotalLandings(state.totalLandings);
     },
     []
   );
@@ -65,8 +79,18 @@ export default function App() {
     async (finalScore: number, maxCombo: number, reason: 'collision' | 'fuel' | 'vip_delay') => {
       const state = gameStateRef.current;
       play('collision');
-      const isNewBest = finalScore > highScore;
-      if (isNewBest) setHighScore(finalScore);
+      const currentLevel = state.level;
+      const currentHighScore = highScores[currentLevel] || 0;
+      const isNewBest = finalScore > currentHighScore;
+      
+      if (isNewBest) {
+        setHighScores(prev => {
+          const next = { ...prev, [currentLevel]: finalScore };
+          localStorage.setItem('skyvector_highscores', JSON.stringify(next));
+          return next;
+        });
+      }
+      
       setGameOverData({
         score: finalScore,
         maxCombo,
@@ -77,27 +101,54 @@ export default function App() {
       maxComboRef.current = maxCombo;
       setScreen('gameover');
     },
-    [play, highScore]
+    [play, highScores]
   );
 
   const gameLoopRef = useRef<ReturnType<typeof useGameLoop> | null>(null);
 
   const handleLevelComplete = useCallback(
     (level: number) => {
+      const state = gameStateRef.current;
+      const currentHighScore = highScores[level] || 0;
+      if (state.score > currentHighScore) {
+        setHighScores(prev => {
+          const next = { ...prev, [level]: state.score };
+          localStorage.setItem('skyvector_highscores', JSON.stringify(next));
+          return next;
+        });
+      }
+
       const nextLevel = level + 1;
       if (nextLevel > unlockedLevel) {
         setUnlockedLevel(nextLevel);
         localStorage.setItem('skyvector_unlocked', String(nextLevel));
       }
-      if (nextLevel <= 8) {
-        setTimeout(() => {
-          gameStateRef.current = createInitialGameState(nextLevel);
-          gameLoopRef.current?.start();
-        }, 1500);
-      }
+      setScreen('levelcomplete');
     },
-    [unlockedLevel]
+    [unlockedLevel, highScores]
   );
+
+  const handleStartNextLevel = useCallback(() => {
+    const nextLevel = gameStateRef.current.level + 1;
+    if (nextLevel <= 8) {
+      const carriedScore = gameStateRef.current.score;
+      setCombo({ count: 0, multiplier: 1, lastLandingTime: 0, timeoutMs: 5000 });
+      setActiveEvent(null);
+      setGameOverData(prev => ({ ...prev, level: nextLevel }));
+      gameStateRef.current = createInitialGameState(nextLevel);
+      gameStateRef.current.score = carriedScore;
+      setScore(carriedScore);
+      setCurrentLevel(nextLevel);
+      setLives(3);
+      setTotalLandings(0);
+      localStorage.setItem('skyvector_last_level', String(nextLevel));
+      setSessionStart(Date.now());
+      setScreen('game');
+      gameLoopRef.current?.start();
+    } else {
+      setScreen('menu');
+    }
+  }, []);
 
   const handleEventTriggered = useCallback(
     (event: GameState['activeEvent']) => {
@@ -108,8 +159,8 @@ export default function App() {
   );
 
   const handleLanding = useCallback(
-    (_callsign: string, isVIP: boolean, isEmergency: boolean) => {
-      if (isVIP) {
+    (_callsign: string, isNORDO: boolean, isEmergency: boolean) => {
+      if (isNORDO) {
         play('landing_vip');
         progressMission('vip_land', 1);
       } else if (isEmergency) {
@@ -185,6 +236,9 @@ export default function App() {
       gameStateRef.current = createInitialGameState(level);
       maxComboRef.current = 1;
       setScore(0);
+      setCurrentLevel(level);
+      setLives(3);
+      setTotalLandings(0);
       setCombo({ count: 0, multiplier: 1, lastLandingTime: 0, timeoutMs: 5000 });
       setActiveEvent(null);
       setIsPaused(false);
@@ -284,6 +338,17 @@ export default function App() {
     play('holding_toggle');
   }, [play]);
 
+  const handleAltitudeChange = useCallback((aircraftId: string, altitude: 1 | 2 | 3) => {
+    gameStateRef.current = {
+      ...gameStateRef.current,
+      aircraft: gameStateRef.current.aircraft.map((a) => {
+        if (a.id !== aircraftId) return a;
+        return { ...a, targetAltitude: altitude };
+      }),
+    };
+    play('draw_path'); // Or some other sound
+  }, [play]);
+
   // ── Canvas ref bridge ─────────────────────────────────────
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
@@ -305,11 +370,13 @@ export default function App() {
             score={score}
             highScore={highScore}
             combo={combo}
-            level={gameStateRef.current.level}
-            totalLandings={gameStateRef.current.totalLandings}
+            level={currentLevel}
+            totalLandings={totalLandings}
             totalXP={profile.totalXP}
             activeEvent={activeEvent}
             aircraftCount={aircraftCount}
+            lives={lives}
+            missions={profile.dailyMissions ?? []}
             onPause={handlePause}
           />
         </div>
@@ -319,6 +386,7 @@ export default function App() {
             onPathDrawn={handlePathDrawn}
             onAircraftSelected={handleAircraftSelected}
             onHoldingToggle={handleHoldingToggle}
+            onAltitudeChange={handleAltitudeChange}
             onCanvasReady={(canvas) => { gameCanvasRef.current = canvas; }}
           />
           {isPaused && (
@@ -338,7 +406,7 @@ export default function App() {
           onNewGame={handleGoToStageSelect}
           onLeaderboard={() => setScreen('leaderboard')}
           onUnlockAllStages={handleUnlockAllStages}
-          highScore={highScore}
+          highScore={Math.max(0, ...Object.values(highScores))}
           canContinue={!!localStorage.getItem('skyvector_last_level')}
         />
       )}
@@ -356,12 +424,12 @@ export default function App() {
       {screen === 'gameover' && (
         <GameOverScreen
           score={gameOverData.score}
-          highScore={highScore}
+          highScore={highScores[gameOverData.level] || 0}
           maxCombo={gameOverData.maxCombo}
           totalLandings={gameOverData.totalLandings}
           level={gameOverData.level}
           reason={gameOverData.reason}
-          isNewHighScore={gameOverData.score >= highScore && gameOverData.score > 0}
+          isNewHighScore={gameOverData.score >= (highScores[gameOverData.level] || 0) && gameOverData.score > 0}
           onRestart={handleRestartFromGameOver}
           onMenu={() => setScreen('menu')}
           onSubmitScore={handleSubmitScore}
@@ -369,11 +437,21 @@ export default function App() {
         />
       )}
 
+      {/* Level Complete Transition */}
+      {screen === 'levelcomplete' && (
+        <LevelCompleteScreen
+          level={gameStateRef.current.level}
+          stats={gameStateRef.current.levelStats}
+          onNextLevel={handleStartNextLevel}
+          onMenu={() => setScreen('menu')}
+        />
+      )}
+
       {/* Leaderboard */}
       {screen === 'leaderboard' && (
         <Leaderboard
           onClose={() => setScreen('menu')}
-          currentPlayerScore={highScore}
+          currentPlayerScore={Math.max(0, ...Object.values(highScores))}
         />
       )}
     </div>
