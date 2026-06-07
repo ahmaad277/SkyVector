@@ -126,6 +126,13 @@ export default function MainMenu({
           unlockedLevel={unlockedLevel}
         />
       )}
+
+      {/* Developer Info */}
+      <div style={styles.developerInfo}>
+        <div>Developer: أحمد غرم الله أحمد الزهراني</div>
+        <div>Phone: 0534897272</div>
+        <div>Email: Ahmaaad277@gmail.com</div>
+      </div>
     </div>
   );
 }
@@ -438,5 +445,21 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '12px 10px',
     cursor: 'pointer',
     boxShadow: '0 0 18px rgba(0,240,255,0.35)',
+  },
+  developerInfo: {
+    position: 'absolute',
+    bottom: 20,
+    left: 0,
+    right: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 4,
+    fontFamily: 'var(--font-mono)',
+    fontSize: 'clamp(9px, 2.5vw, 11px)',
+    color: 'rgba(255, 255, 255, 0.4)',
+    pointerEvents: 'none',
+    zIndex: 1,
+    textAlign: 'center',
   },
 };
