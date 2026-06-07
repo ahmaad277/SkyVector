@@ -19,3 +19,14 @@ export const supabase = createClient(
 );
 
 export const isSupabaseReady = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+
+// Initiate anonymous sign-in early to ensure session is available
+if (isSupabaseReady) {
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    if (!session) {
+      supabase.auth.signInAnonymously().catch(err => {
+        console.warn('[SkyVector] Early anonymous sign-in failed:', err);
+      });
+    }
+  });
+}

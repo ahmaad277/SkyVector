@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { isSupabaseReady } from '../supabase/client';
+import { supabase, isSupabaseReady } from '../supabase/client';
 import {
-  signInAnonymously,
   getCurrentUser,
   upsertPlayer,
   submitScore,
@@ -65,16 +64,16 @@ export function useSupabase() {
   // ── Auth init ───────────────────────────────────────────────
   useEffect(() => {
     (async () => {
+      let currentId = profile.id;
       if (isSupabaseReady) {
-        let user = await getCurrentUser();
-        if (!user) {
-          const id = await signInAnonymously();
-          if (id) {
-            user = { id } as any;
-          }
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          await supabase.auth.signInAnonymously();
         }
         
+        const user = await getCurrentUser();
         if (user) {
+          currentId = user.id;
           setProfile(prev => {
             const updated = { ...prev, id: user.id };
             saveLocalProfile(updated);
@@ -82,8 +81,8 @@ export function useSupabase() {
           });
         }
       }
-      const missions = await getDailyMissions(profile.id);
-      setMissions(missions);
+      const fetchedMissions = await getDailyMissions(currentId);
+      setMissions(fetchedMissions);
     })();
   }, []);
 
