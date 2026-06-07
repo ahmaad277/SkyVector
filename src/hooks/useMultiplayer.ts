@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase, isSupabaseReady } from '../supabase/client';
 import { getCurrentUser } from '../supabase/queries';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -33,6 +33,39 @@ export function useMultiplayer() {
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+
+  // Auth listener
+  useEffect(() => {
+    if (!isSupabaseReady) {
+      setIsLoadingAuth(false);
+      return;
+    }
+
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        await supabase.auth.signInAnonymously();
+      }
+      setIsLoadingAuth(false);
+    };
+
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        setIsLoadingAuth(false);
+        setError(null); // Clear any auth errors
+      } else if (event === 'SIGNED_OUT') {
+        setIsLoadingAuth(true);
+        supabase.auth.signInAnonymously();
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   // Generate a random 6-character code
   const generateCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -233,6 +266,7 @@ export function useMultiplayer() {
     room,
     players,
     loading,
+    isLoadingAuth,
     error,
     createRoom,
     joinRoom,

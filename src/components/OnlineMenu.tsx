@@ -7,7 +7,7 @@ interface OnlineMenuProps {
 }
 
 export default function OnlineMenu({ onBack, username }: OnlineMenuProps) {
-  const { createRoom, joinRoom, loading, error } = useMultiplayer();
+  const { createRoom, joinRoom, loading, isLoadingAuth, error } = useMultiplayer();
   const [joinCode, setJoinCode] = useState('');
   const [mode, setMode] = useState<MultiplayerMode>('coop_shared');
   const level = 1; // Default level for now
@@ -28,7 +28,13 @@ export default function OnlineMenu({ onBack, username }: OnlineMenuProps) {
       <div style={styles.card}>
         <h1 style={styles.title}>ONLINE MULTIPLAYER</h1>
         
-        {error && <div style={styles.error}>{error}</div>}
+        {isLoadingAuth ? (
+          <div style={{ ...styles.error, color: '#00F0FF', borderColor: 'rgba(0,240,255,0.3)' }}>
+            Connecting to server...
+          </div>
+        ) : error ? (
+          <div style={styles.error}>{error}</div>
+        ) : null}
         
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>CREATE ROOM</h2>
@@ -47,7 +53,7 @@ export default function OnlineMenu({ onBack, username }: OnlineMenuProps) {
           <button 
             style={styles.primaryBtn} 
             onClick={handleCreate}
-            disabled={loading}
+            disabled={loading || isLoadingAuth}
           >
             {loading ? 'CREATING...' : 'CREATE ROOM'}
           </button>
@@ -69,7 +75,7 @@ export default function OnlineMenu({ onBack, username }: OnlineMenuProps) {
             <button 
               type="submit" 
               style={styles.primaryBtn}
-              disabled={loading || joinCode.length !== 6}
+              disabled={loading || isLoadingAuth || joinCode.length !== 6}
             >
               JOIN
             </button>
