@@ -138,7 +138,7 @@ const styles: Record<string, React.CSSProperties> = {
   eventText: {
     color: COLORS.HUD_DANGER,
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 'clamp(11px, 3.5vw, 14px)',
     letterSpacing: 1,
   },
   buffsContainer: {
@@ -162,14 +162,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   buffName: {
     fontFamily: 'var(--font-mono)',
-    fontSize: 10,
+    fontSize: 'clamp(8px, 2.5vw, 10px)',
     fontWeight: 700,
     color: '#FFD700',
     letterSpacing: 1,
   },
   buffTime: {
     fontFamily: 'var(--font-mono)',
-    fontSize: 10,
+    fontSize: 'clamp(8px, 2.5vw, 10px)',
     color: '#FFF',
   },
   streakContainer: {
@@ -187,7 +187,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   streakLabel: {
     fontFamily: 'var(--font-mono)',
-    fontSize: 10,
+    fontSize: 'clamp(9px, 3vw, 12px)',
     color: '#FFD700',
     letterSpacing: 1,
   },

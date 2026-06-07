@@ -128,7 +128,7 @@ export default function HUD({
 
       {/* Rank Bar (bottom) */}
       <div style={styles.rankBar}>
-        <span style={{ color: rank.color, marginRight: 6, fontSize: 13, fontWeight: 'bold' }}>
+        <span style={{ color: rank.color, marginRight: 6, fontWeight: 'bold' }}>
           {rank.badge} {rank.rank}
         </span>
         <div style={styles.xpTrack}>
@@ -140,7 +140,7 @@ export default function HUD({
             }}
           />
         </div>
-        <span style={{ color: COLORS.HUD_DIM, marginLeft: 6, fontSize: 12 }}>
+        <span style={{ color: COLORS.HUD_DIM, marginLeft: 6, fontSize: 'clamp(9px, 2.5vw, 12px)' }}>
           {totalXP.toLocaleString()} XP
         </span>
       </div>
@@ -193,14 +193,14 @@ const styles: Record<string, React.CSSProperties> = {
   eventText: {
     color: COLORS.HUD_DANGER,
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 'clamp(11px, 3.5vw, 14px)',
     letterSpacing: 1,
   },
   rankBar: {
     display: 'flex',
     alignItems: 'center',
     gap: 4,
-    fontSize: 13,
+    fontSize: 'clamp(10px, 3vw, 13px)',
   },
   xpTrack: {
     flex: 1,
