@@ -144,10 +144,6 @@ export function processSurvivalLanding(state: SurvivalState, type: AircraftType,
   newState.roundLandings += 1;
   newState.totalLandings += 1;
 
-  if (newState.roundLandings >= newState.roundLandingTarget && !newState.pendingPowerUpChoices) {
-    newState.pendingPowerUpChoices = generatePowerUpChoices();
-  }
-
   return newState;
 }
 

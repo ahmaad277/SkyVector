@@ -15,20 +15,18 @@ import { simplifyPath, smoothPath, findClosestForwardProgress } from './utils/pa
 
 import SurvivalModeScreen from './components/SurvivalModeScreen';
 import SurvivalHUD from './components/SurvivalHUD';
-import SurvivalRoundComplete from './components/SurvivalRoundComplete';
 import SurvivalGameOver from './components/SurvivalGameOver';
 import OnlineMenu from './components/OnlineMenu';
 import LobbyScreen from './components/LobbyScreen';
 import { useMultiplayer } from './hooks/useMultiplayer';
-import { createInitialSurvivalState, getRoundLandingTarget, getRoundTimeLimit, applyPowerUp, getSurvivalLevelConfig } from './engine/SurvivalEngine';
-import type { PowerUp, SurvivalState } from './types/survival.types';
+import { createInitialSurvivalState, getSurvivalLevelConfig } from './engine/SurvivalEngine';
 import { LEVELS } from './levels';
 
 import { getBackgroundTheme } from './utils/backgroundThemes';
 
 import { createMultiplayerState, type PlayerInput } from './engine/MultiplayerEngine';
 
-type AppScreen = 'menu' | 'stage_select' | 'game' | 'gameover' | 'leaderboard' | 'levelcomplete' | 'survival_menu' | 'survival_complete' | 'online_menu' | 'lobby';
+type AppScreen = 'menu' | 'stage_select' | 'game' | 'gameover' | 'leaderboard' | 'levelcomplete' | 'survival_menu' | 'online_menu' | 'lobby';
 
 export default function App() {
   // ── UI state (React) ─────────────────────────────────────
@@ -168,6 +166,19 @@ export default function App() {
   const handleLevelComplete = useCallback(
     (level: number) => {
       const state = gameStateRef.current;
+      
+      if (state.survivalState) {
+        // In survival, this is just a round transition. Pick a new mission and continue.
+        const uncompletedMissions = missions.filter(m => !m.completed);
+        if (uncompletedMissions.length > 0) {
+          const randomMission = uncompletedMissions[Math.floor(Math.random() * uncompletedMissions.length)];
+          setActiveMissionId(randomMission.id);
+        } else {
+          setActiveMissionId(null);
+        }
+        return;
+      }
+
       const currentHighScore = highScores[level] || 0;
       if (state.score > currentHighScore) {
         setHighScores(prev => {
@@ -184,7 +195,7 @@ export default function App() {
       }
       setScreen('levelcomplete');
     },
-    [unlockedLevel, highScores]
+    [unlockedLevel, highScores, missions]
   );
 
   const handleStartNextLevel = useCallback(() => {
@@ -359,50 +370,6 @@ export default function App() {
     setActiveEvent(null);
     setIsPaused(false);
     setSessionStart(Date.now());
-    setScreen('game');
-    setTimeout(() => gameLoopRef.current?.start(), 50);
-  }, [missions]);
-
-  const handleSurvivalRoundNext = useCallback((powerUp: PowerUp) => {
-    const state = gameStateRef.current;
-    if (!state.survivalState) return;
-
-    const nextRound = state.survivalState.round + 1;
-    let newSurvState: SurvivalState = {
-      ...state.survivalState,
-      round: nextRound,
-      roundStartTime: Date.now(),
-      roundTimerMs: getRoundTimeLimit(nextRound),
-      roundLandings: 0,
-      roundLandingTarget: getRoundLandingTarget(nextRound),
-      pendingPowerUpChoices: null,
-    };
-    
-    newSurvState = applyPowerUp(newSurvState, powerUp, Date.now());
-    const config = getSurvivalLevelConfig(nextRound);
-
-    // Keep the same game state mostly, just reset aircraft/events
-    gameStateRef.current = {
-      ...state,
-      phase: 'playing',
-      aircraft: [],
-      activeEvent: null,
-      survivalState: newSurvState,
-      runways: config.runways.map((r) => ({ ...r, isOpen: true, closedUntil: 0 })),
-      windDirection: config.windDirection,
-      windStrength: config.windStrength,
-      altitudeEnabled: true,
-    };
-    
-    // Pick a random uncompleted mission for this new survival round
-    const uncompletedMissions = missions.filter(m => !m.completed);
-    if (uncompletedMissions.length > 0) {
-      const randomMission = uncompletedMissions[Math.floor(Math.random() * uncompletedMissions.length)];
-      setActiveMissionId(randomMission.id);
-    } else {
-      setActiveMissionId(null);
-    }
-    
     setScreen('game');
     setTimeout(() => gameLoopRef.current?.start(), 50);
   }, [missions]);
@@ -652,6 +619,7 @@ export default function App() {
             <SurvivalHUD
               survivalState={gameStateRef.current.survivalState}
               missions={activeMission ? [activeMission] : []}
+              activeEvent={activeEvent}
               onPause={handlePause}
             />
           ) : (
@@ -751,14 +719,6 @@ export default function App() {
           stats={gameStateRef.current.levelStats}
           onNextLevel={handleStartNextLevel}
           onMenu={() => setScreen('menu')}
-        />
-      )}
-
-      {/* Survival Round Complete */}
-      {screen === 'survival_complete' && gameStateRef.current.survivalState && (
-        <SurvivalRoundComplete
-          state={gameStateRef.current.survivalState}
-          onSelectPowerUp={handleSurvivalRoundNext}
         />
       )}
 

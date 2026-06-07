@@ -1,23 +1,42 @@
 import React, { useEffect, useState } from 'react';
 import type { SurvivalState } from '../types/survival.types';
-import type { DailyMission } from '../types/game.types';
+import type { DailyMission, GameEvent } from '../types/game.types';
 import { POWER_UPS } from '../engine/SurvivalEngine';
+import { COLORS } from '../utils/colorPalette';
 import DailyMissionsPanel from './hud/DailyMissionsPanel';
 import GameTopBar from './hud/GameTopBar';
 
 interface SurvivalHUDProps {
   survivalState: SurvivalState;
   missions: DailyMission[];
+  activeEvent: GameEvent | null;
   onPause: () => void;
 }
 
-export default function SurvivalHUD({ survivalState, missions, onPause }: SurvivalHUDProps) {
+export default function SurvivalHUD({ survivalState, missions, activeEvent, onPause }: SurvivalHUDProps) {
   const [now, setNow] = useState(Date.now());
+  const [eventAnim, setEventAnim] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (activeEvent) {
+      setEventAnim(true);
+      const t = setTimeout(() => setEventAnim(false), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [activeEvent]);
+
+  const eventLabel: Record<string, (e: GameEvent) => string> = {
+    runway_closed: () => '⛔ RUNWAY CLOSED',
+    wind_shear:    () => '🌀 WIND SHEAR',
+    nordo_flight:  () => '★ NORDO AIRCRAFT INBOUND',
+    bird_strike:   () => '🐦 BIRD STRIKE ZONE',
+    round_start:   (e) => `ROUND ${e.payload?.round} STARTED! +${e.payload?.powerUpName}`,
+  };
 
   return (
     <div style={styles.root}>
@@ -26,6 +45,21 @@ export default function SurvivalHUD({ survivalState, missions, onPause }: Surviv
         onPause={onPause}
         survivalState={survivalState}
       />
+
+      {/* Event Banner */}
+      {activeEvent && (
+        <div
+          style={{
+            ...styles.eventBanner,
+            animation: eventAnim ? 'hudEventPulse 0.5s ease' : undefined,
+          }}
+        >
+          <span style={styles.eventText}>
+            {eventLabel[activeEvent.type] ? eventLabel[activeEvent.type](activeEvent) : '⚠ ALERT'}
+          </span>
+          <EventTimer event={activeEvent} />
+        </div>
+      )}
 
       {/* Active Buffs */}
       {survivalState.activeBuffs.length > 0 && (
@@ -65,11 +99,47 @@ export default function SurvivalHUD({ survivalState, missions, onPause }: Surviv
   );
 }
 
+// ── Event countdown ───────────────────────────────────────────
+function EventTimer({ event }: { event: GameEvent }) {
+  const [remaining, setRemaining] = useState(event.duration / 1000);
+  useEffect(() => {
+    const id = setInterval(() => {
+      const elapsed = Date.now() - event.startTime;
+      setRemaining(Math.max(0, (event.duration - elapsed) / 1000));
+    }, 200);
+    return () => clearInterval(id);
+  }, [event]);
+
+  return (
+    <span style={{ color: COLORS.HUD_WARNING, marginLeft: 10, fontSize: 11 }}>
+      {remaining.toFixed(0)}s
+    </span>
+  );
+}
+
 const styles: Record<string, React.CSSProperties> = {
   root: {
     width: '100%',
     padding: '6px 10px',
     pointerEvents: 'none',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  eventBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: '4px 10px',
+    background: 'rgba(255,0,60,0.12)',
+    border: '1px solid rgba(255,0,60,0.4)',
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  eventText: {
+    color: COLORS.HUD_DANGER,
+    fontWeight: 'bold',
+    fontSize: 14,
+    letterSpacing: 1,
   },
   buffsContainer: {
     position: 'absolute',

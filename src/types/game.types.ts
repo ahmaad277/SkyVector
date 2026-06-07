@@ -6,7 +6,7 @@ export type AircraftType = 'cessna' | 'jetliner' | 'fighter' | 'helicopter';
 export type AircraftState = 'flying' | 'landing' | 'landed' | 'holding' | 'emergency' | 'crashed' | 'fuel_critical' | 'altitude_change';
 export type RunwayType = 'short' | 'long' | 'helipad';
 export type GamePhase = 'menu' | 'playing' | 'paused' | 'gameover' | 'levelcomplete';
-export type EventType = 'runway_closed' | 'wind_shear' | 'nordo_flight' | 'bird_strike' | 'none';
+export type EventType = 'runway_closed' | 'wind_shear' | 'nordo_flight' | 'bird_strike' | 'round_start' | 'none';
 export type PlayerRank =
   | '2LT'
   | '1LT'
@@ -99,6 +99,8 @@ export interface GameEvent {
     windDelta?: number;
     nordoAircraftId?: string;
     birdStrikeZone?: { center: Vec2; radius: number };
+    powerUpName?: string;
+    round?: number;
   };
 }
 

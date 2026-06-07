@@ -11,7 +11,7 @@ import {
 } from './EventBus';
 import { LEVELS } from '../levels';
 import { getLandingTargetForLevel } from '../utils/levelProgress';
-import { getSurvivalLevelConfig, processSurvivalLanding, expireBuffs, hasBuff, consumeIronShield } from './SurvivalEngine';
+import { getSurvivalLevelConfig, processSurvivalLanding, expireBuffs, hasBuff, consumeIronShield, generatePowerUpChoices, applyPowerUp, getRoundTimeLimit, getRoundLandingTarget } from './SurvivalEngine';
 import { applyPlayerInput } from './MultiplayerEngine';
 
 interface UseGameLoopOptions {
@@ -111,12 +111,34 @@ export function useGameLoop(options: UseGameLoopOptions) {
         }
         
         // Check if round complete
-        if (survState.pendingPowerUpChoices) {
-           isRunningRef.current = false;
-           gameStateRef.current = { ...newState, phase: 'survival_complete', survivalState: survState };
-           renderFrame(gameStateRef.current, canvas);
-           onLevelComplete(survState.round);
-           return;
+        if (survState.roundLandings >= survState.roundLandingTarget) {
+           const nextRound = survState.round + 1;
+           const choices = generatePowerUpChoices();
+           const awardedPowerUp = choices[Math.floor(Math.random() * choices.length)];
+           
+           survState = {
+             ...survState,
+             round: nextRound,
+             roundStartTime: now,
+             roundTimerMs: getRoundTimeLimit(nextRound),
+             roundLandings: 0,
+             roundLandingTarget: getRoundLandingTarget(nextRound),
+           };
+           survState = applyPowerUp(survState, awardedPowerUp, now);
+           
+           const newConfig = getSurvivalLevelConfig(nextRound);
+           newState.runways = newConfig.runways.map((r) => ({ ...r, isOpen: true, closedUntil: 0 }));
+           newState.windDirection = newConfig.windDirection;
+           newState.windStrength = newConfig.windStrength;
+           
+           newState.activeEvent = {
+             type: 'round_start',
+             startTime: now,
+             duration: 4000,
+             payload: { round: nextRound, powerUpName: awardedPowerUp.name }
+           };
+           onEventTriggered(newState.activeEvent);
+           onLevelComplete(nextRound);
         }
 
         newState.survivalState = survState;

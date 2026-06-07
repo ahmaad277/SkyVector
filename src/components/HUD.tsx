@@ -86,11 +86,12 @@ export default function HUD({
   // Expose flash trigger
   (HUD as any)._triggerFlash = triggerLandingFlash;
 
-  const eventLabel: Record<string, string> = {
-    runway_closed: '⛔ RUNWAY CLOSED',
-    wind_shear:    '🌀 WIND SHEAR',
-    nordo_flight:  '★ NORDO AIRCRAFT INBOUND',
-    bird_strike:   '🐦 BIRD STRIKE ZONE',
+  const eventLabel: Record<string, (e: GameEvent) => string> = {
+    runway_closed: () => '⛔ RUNWAY CLOSED',
+    wind_shear:    () => '🌀 WIND SHEAR',
+    nordo_flight:  () => '★ NORDO AIRCRAFT INBOUND',
+    bird_strike:   () => '🐦 BIRD STRIKE ZONE',
+    round_start:   (e) => `ROUND ${e.payload?.round} STARTED! +${e.payload?.powerUpName}`,
   };
 
   return (
@@ -119,7 +120,7 @@ export default function HUD({
           }}
         >
           <span style={styles.eventText}>
-            {eventLabel[activeEvent.type] ?? '⚠ ALERT'}
+            {eventLabel[activeEvent.type] ? eventLabel[activeEvent.type](activeEvent) : '⚠ ALERT'}
           </span>
           <EventTimer event={activeEvent} />
         </div>
