@@ -74,9 +74,13 @@ export default function OnlineMenu({ onBack, username, multiplayer }: OnlineMenu
             <input
               style={styles.input}
               type="text"
+              inputMode="text"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
               placeholder="ENTER 6-DIGIT CODE"
               value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
               maxLength={6}
             />
             <button 
