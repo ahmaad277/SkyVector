@@ -114,7 +114,8 @@ export default function MainMenu({
           })}
         </div>
 
-        <div style={styles.version}>v1.0 · SKYVECTOR</div>
+        <div style={styles.version}>Ahmaaad277@gmail.com</div>
+        <div style={{ ...styles.version, marginTop: -12 }}>v2.0 · SKYVECTOR</div>
       </div>
 
       {settingsOpen && (
@@ -127,12 +128,6 @@ export default function MainMenu({
         />
       )}
 
-      {/* Developer Info */}
-      <div style={styles.developerInfo}>
-        <div style={styles.developerName}>أحمد غرم الله أحمد الزهراني</div>
-        <div>0534897272</div>
-        <div>Ahmaaad277@gmail.com</div>
-      </div>
     </div>
   );
 }
@@ -445,26 +440,5 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '12px 10px',
     cursor: 'pointer',
     boxShadow: '0 0 18px rgba(0,240,255,0.35)',
-  },
-  developerInfo: {
-    position: 'absolute',
-    bottom: 'calc(env(safe-area-inset-bottom) + 6px)',
-    left: 0,
-    right: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 1,
-    lineHeight: 1.2,
-    fontFamily: 'var(--font-mono)',
-    fontSize: 'clamp(9px, 2.5vw, 11px)',
-    color: 'rgba(255, 255, 255, 0.4)',
-    pointerEvents: 'none',
-    zIndex: 1,
-    textAlign: 'center',
-  },
-  developerName: {
-    wordSpacing: '-2px',
-    letterSpacing: '-0.3px',
   },
 };

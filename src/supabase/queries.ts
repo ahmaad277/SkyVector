@@ -1,4 +1,5 @@
 import { supabase, isSupabaseReady } from './client';
+import { ensureAuthSession } from './auth';
 import type { LeaderboardEntry, DailyMission } from '../types/game.types';
 
 // ── Score submission ──────────────────────────────────────────
@@ -72,6 +73,9 @@ export async function upsertPlayer(params: {
 export async function getDailyMissions(playerId: string): Promise<DailyMission[]> {
   if (!isSupabaseReady) return generateLocalMissions();
 
+  const isAuthUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(playerId);
+  if (!isAuthUuid) return generateLocalMissions();
+
   const today = new Date().toISOString().split('T')[0];
   const { data, error } = await supabase
     .from('daily_missions')
@@ -122,11 +126,16 @@ export async function updateMissionProgress(
 }
 
 // ── Auth helpers ──────────────────────────────────────────────
+export { ensureAuthSession, getExistingAuthUserId } from './auth';
+
 export async function signInAnonymously(): Promise<string | null> {
   if (!isSupabaseReady) return `guest-${Date.now()}`;
-  const { data, error } = await supabase.auth.signInAnonymously();
-  if (error) return null;
-  return data.user?.id ?? null;
+  try {
+    const { id } = await ensureAuthSession();
+    return id;
+  } catch {
+    return null;
+  }
 }
 
 export async function signInWithGoogle(): Promise<void> {
@@ -141,8 +150,13 @@ export async function signInWithApple(): Promise<void> {
 
 export async function getCurrentUser() {
   if (!isSupabaseReady) return null;
-  const { data } = await supabase.auth.getUser();
-  return data.user;
+  try {
+    const { id } = await ensureAuthSession();
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user ?? { id } as import('@supabase/supabase-js').User;
+  } catch {
+    return null;
+  }
 }
 
 // ── Real-time leaderboard subscription ───────────────────────

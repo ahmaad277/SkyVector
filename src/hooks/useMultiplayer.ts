@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase, isSupabaseReady } from '../supabase/client';
-import { getCurrentUser } from '../supabase/queries';
+import { ensureAuthSession } from '../supabase/auth';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export type MultiplayerMode = 'coop_shared' | 'coop_squad' | 'versus';
@@ -33,32 +33,52 @@ export function useMultiplayer() {
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(false);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const roomRef = useRef<Room | null>(null);
+  const authPromiseRef = useRef<Promise<string | null> | null>(null);
 
-  // Auth listener
   useEffect(() => {
+    roomRef.current = room;
+  }, [room]);
+
+  const prepareAuth = useCallback(async (): Promise<string | null> => {
     if (!isSupabaseReady) {
-      setIsLoadingAuth(false);
-      return;
+      setError('Supabase not configured');
+      return null;
     }
+    if (authUserId) return authUserId;
+    if (authPromiseRef.current) return authPromiseRef.current;
 
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        await supabase.auth.signInAnonymously();
-      }
-      setIsLoadingAuth(false);
-    };
+    setIsLoadingAuth(true);
+    setError(null);
 
-    checkAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
+    authPromiseRef.current = (async () => {
+      try {
+        const { id } = await ensureAuthSession();
+        setAuthUserId(id);
+        return id;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Authentication failed';
+        setError(message);
+        return null;
+      } finally {
         setIsLoadingAuth(false);
-        setError(null); // Clear any auth errors
-      } else if (event === 'SIGNED_OUT') {
-        setIsLoadingAuth(true);
-        supabase.auth.signInAnonymously();
+        authPromiseRef.current = null;
+      }
+    })();
+
+    return authPromiseRef.current;
+  }, [authUserId]);
+
+  useEffect(() => {
+    if (!isSupabaseReady) return;
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user?.id) {
+        setAuthUserId(session.user.id);
+        setIsLoadingAuth(false);
+        setError(null);
       }
     });
 
@@ -67,26 +87,60 @@ export function useMultiplayer() {
     };
   }, []);
 
-  // Generate a random 6-character code
   const generateCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
+  const joinRealtimeChannel = useCallback((roomData: Room) => {
+    if (channel) {
+      supabase.removeChannel(channel);
+    }
+
+    const newChannel = supabase.channel(`room:${roomData.code}`);
+
+    newChannel
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'room_players', filter: `room_id=eq.${roomData.id}` },
+        () => {
+          supabase
+            .from('room_players')
+            .select('*')
+            .eq('room_id', roomData.id)
+            .then(({ data }) => {
+              if (data) setPlayers(data);
+            });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomData.id}` },
+        (payload) => {
+          setRoom(payload.new as Room);
+        }
+      )
+      .subscribe();
+
+    setChannel(newChannel);
+  }, [channel]);
+
   const createRoom = useCallback(async (username: string, mode: MultiplayerMode = 'coop_shared', level: number = 1) => {
-    if (!isSupabaseReady) return setError('Supabase not configured');
+    if (!isSupabaseReady) {
+      setError('Supabase not configured');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const user = await getCurrentUser();
-      if (!user) throw new Error('Not authenticated');
+      const { id: userId } = await ensureAuthSession();
+      setAuthUserId(userId);
 
       const code = generateCode();
       const seed = Math.floor(Math.random() * 1000000);
 
-      // 1. Create room
       const { data: roomData, error: roomError } = await supabase
         .from('rooms')
         .insert({
           code,
-          host_id: user.id,
+          host_id: userId,
           mode,
           level,
           seed,
@@ -97,12 +151,11 @@ export function useMultiplayer() {
 
       if (roomError) throw roomError;
 
-      // 2. Join as host
       const { data: playerData, error: playerError } = await supabase
         .from('room_players')
         .insert({
           room_id: roomData.id,
-          player_id: user.id,
+          player_id: userId,
           username,
           slot: 1,
           color: 'cyan',
@@ -115,23 +168,31 @@ export function useMultiplayer() {
 
       setRoom(roomData);
       setPlayers([playerData]);
-      joinRealtimeChannel(roomData.code);
-    } catch (err: any) {
-      setError(err.message);
+      joinRealtimeChannel(roomData);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: string }).message)
+          : err instanceof Error
+            ? err.message
+            : 'Failed to create room';
+      setError(message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [joinRealtimeChannel]);
 
   const joinRoom = useCallback(async (code: string, username: string) => {
-    if (!isSupabaseReady) return setError('Supabase not configured');
+    if (!isSupabaseReady) {
+      setError('Supabase not configured');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const user = await getCurrentUser();
-      if (!user) throw new Error('Not authenticated');
+      const { id: userId } = await ensureAuthSession();
+      setAuthUserId(userId);
 
-      // 1. Find room
       const { data: roomData, error: roomError } = await supabase
         .from('rooms')
         .select('*')
@@ -141,7 +202,6 @@ export function useMultiplayer() {
       if (roomError || !roomData) throw new Error('Room not found');
       if (roomData.status !== 'lobby') throw new Error('Room already in progress');
 
-      // 2. Get current players to find next slot/color
       const { data: existingPlayers, error: existingError } = await supabase
         .from('room_players')
         .select('*')
@@ -154,12 +214,11 @@ export function useMultiplayer() {
       const colors = ['cyan', 'magenta', 'amber', 'lime', 'coral', 'violet'];
       const color = colors[(slot - 1) % colors.length];
 
-      // 3. Join room
       const { data: playerData, error: playerError } = await supabase
         .from('room_players')
         .insert({
           room_id: roomData.id,
-          player_id: user.id,
+          player_id: userId,
           username,
           slot,
           color,
@@ -172,25 +231,26 @@ export function useMultiplayer() {
 
       setRoom(roomData);
       setPlayers([...existingPlayers, playerData]);
-      joinRealtimeChannel(roomData.code);
-    } catch (err: any) {
-      setError(err.message);
+      joinRealtimeChannel(roomData);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to join room';
+      setError(message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [joinRealtimeChannel]);
 
   const leaveRoom = useCallback(async () => {
-    if (!room || !isSupabaseReady) return;
+    const currentRoom = roomRef.current;
+    if (!currentRoom || !isSupabaseReady) return;
     try {
-      const user = await getCurrentUser();
-      if (user) {
-        await supabase
-          .from('room_players')
-          .delete()
-          .eq('room_id', room.id)
-          .eq('player_id', user.id);
-      }
+      const { id: userId } = await ensureAuthSession();
+      await supabase
+        .from('room_players')
+        .delete()
+        .eq('room_id', currentRoom.id)
+        .eq('player_id', userId);
+
       if (channel) {
         supabase.removeChannel(channel);
         setChannel(null);
@@ -200,73 +260,46 @@ export function useMultiplayer() {
     } catch (err) {
       console.error('Error leaving room:', err);
     }
-  }, [room, channel]);
+  }, [channel]);
 
   const updateReadyStatus = useCallback(async (isReady: boolean) => {
-    if (!room || !isSupabaseReady) return;
+    const currentRoom = roomRef.current;
+    if (!currentRoom || !isSupabaseReady) return;
     try {
-      const user = await getCurrentUser();
-      if (!user) return;
+      const { id: userId } = await ensureAuthSession();
       await supabase
         .from('room_players')
         .update({ is_ready: isReady })
-        .eq('room_id', room.id)
-        .eq('player_id', user.id);
+        .eq('room_id', currentRoom.id)
+        .eq('player_id', userId);
     } catch (err) {
       console.error('Error updating ready status:', err);
     }
-  }, [room]);
+  }, []);
 
   const startGame = useCallback(async () => {
-    if (!room || !isSupabaseReady) return;
+    const currentRoom = roomRef.current;
+    if (!currentRoom || !isSupabaseReady) return;
     try {
-      const user = await getCurrentUser();
-      if (user?.id !== room.host_id) throw new Error('Only host can start game');
-      
+      const { id: userId } = await ensureAuthSession();
+      if (userId !== currentRoom.host_id) throw new Error('Only host can start game');
+
       await supabase
         .from('rooms')
         .update({ status: 'playing' })
-        .eq('id', room.id);
-    } catch (err: any) {
-      setError(err.message);
+        .eq('id', currentRoom.id);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to start game';
+      setError(message);
     }
-  }, [room]);
-
-  const joinRealtimeChannel = (code: string) => {
-    const newChannel = supabase.channel(`room:${code}`);
-
-    newChannel
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'room_players', filter: `room_id=eq.${room?.id}` },
-        () => {
-          // Refresh players list
-          supabase
-            .from('room_players')
-            .select('*')
-            .eq('room_id', room?.id)
-            .then(({ data }) => {
-              if (data) setPlayers(data);
-            });
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${room?.id}` },
-        (payload) => {
-          setRoom(payload.new as Room);
-        }
-      )
-      .subscribe();
-
-    setChannel(newChannel);
-  };
+  }, []);
 
   return {
     room,
     players,
     loading,
     isLoadingAuth,
+    authUserId,
     error,
     createRoom,
     joinRoom,
@@ -274,5 +307,6 @@ export function useMultiplayer() {
     updateReadyStatus,
     startGame,
     channel,
+    prepareAuth,
   };
 }

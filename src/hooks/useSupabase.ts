@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase, isSupabaseReady } from '../supabase/client';
+import { isSupabaseReady } from '../supabase/client';
 import {
-  getCurrentUser,
-  upsertPlayer,
-  submitScore,
+  getExistingAuthUserId,
+  ensureAuthSession,
   getDailyMissions,
+  submitScore,
+  upsertPlayer,
   updateMissionProgress,
 } from '../supabase/queries';
-import type { DailyMission, PlayerProfile, PlayerRank } from '../types/game.types';
+import type { PlayerProfile, DailyMission, PlayerRank } from '../types/game.types';
 import { RANK_THRESHOLDS } from '../types/game.types';
 
 function xpToRank(xp: number): PlayerRank {
@@ -47,22 +48,19 @@ export function useSupabase() {
   const [profile, setProfile] = useState<PlayerProfile>(loadLocalProfile);
   const [missions, setMissions] = useState<DailyMission[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const [online, setOnline] = useState(false);
 
   // ── Auth init ───────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       let currentId = profile.id;
       if (isSupabaseReady) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          await supabase.auth.signInAnonymously();
-        }
-        
-        const user = await getCurrentUser();
-        if (user) {
-          currentId = user.id;
+        const existingId = await getExistingAuthUserId();
+        if (existingId) {
+          currentId = existingId;
+          setOnline(true);
           setProfile(prev => {
-            const updated = { ...prev, id: user.id };
+            const updated = { ...prev, id: existingId };
             saveLocalProfile(updated);
             return updated;
           });
@@ -118,10 +116,15 @@ export function useSupabase() {
 
       // Sync to Supabase
       try {
+        let playerId = profile.id;
+        if (isSupabaseReady) {
+          const { id } = await ensureAuthSession();
+          playerId = id;
+        }
         await Promise.all([
-          submitScore({ ...params, playerId: profile.id, username: profile.username }),
+          submitScore({ ...params, playerId, username: profile.username }),
           upsertPlayer({
-            id: profile.id,
+            id: playerId,
             username: profile.username,
             totalXP: newXP,
             bestScore: updated.bestScore,

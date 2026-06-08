@@ -82,6 +82,12 @@ export default function App() {
   const { play } = useAudio();
   const { profile, missions, saveGameResult, progressMission } = useSupabase();
   const multiplayer = useMultiplayer();
+  const authUserId = multiplayer.authUserId ?? profile.id;
+
+  const handleGoOnline = useCallback(() => {
+    setScreen('online_menu');
+    void multiplayer.prepareAuth();
+  }, [multiplayer]);
 
   // ── Rendering (called from game loop) ────────────────────
   const renderFrameCb = useCallback(
@@ -298,7 +304,7 @@ export default function App() {
   useEffect(() => {
     if (!multiplayer.channel || !multiplayer.room || screen !== 'game') return;
 
-    const isHost = multiplayer.room.host_id === profile.id;
+    const isHost = multiplayer.room.host_id === authUserId;
 
     if (isHost) {
       // Host receives inputs
@@ -323,7 +329,7 @@ export default function App() {
     return () => {
       multiplayer.channel?.unsubscribe();
     };
-  }, [multiplayer.channel, multiplayer.room, profile.id, screen, renderFrameCb]);
+  }, [multiplayer.channel, multiplayer.room, authUserId, screen, renderFrameCb]);
   // ── Radar ping every ~3s ──────────────────────────────────
   useEffect(() => {
     if (screen !== 'game' || isPaused) return;
@@ -379,7 +385,7 @@ export default function App() {
         gameStateRef.current.multiplayerState = createMultiplayerState(
           multiplayer.room,
           multiplayer.players,
-          profile.id
+          authUserId
         );
         gameStateRef.current.altitudeEnabled = true;
       }
@@ -400,7 +406,7 @@ export default function App() {
       setScreen('game');
       setTimeout(() => gameLoopRef.current?.start(), 50);
     },
-    [multiplayer, profile.id, missions]
+    [multiplayer, authUserId, missions]
   );
 
   const handleContinue = useCallback(() => {
@@ -475,11 +481,11 @@ export default function App() {
 
   // ── Path drawn callback (from RadarScreen) ────────────────
   const handlePathDrawn = useCallback((aircraftId: string, path: Vec2[]) => {
-    if (multiplayer.room && multiplayer.room.host_id !== profile.id && multiplayer.channel) {
+    if (multiplayer.room && multiplayer.room.host_id !== authUserId && multiplayer.channel) {
       multiplayer.channel.send({
         type: 'broadcast',
         event: 'player_input',
-        payload: { type: 'draw_path', aircraftId, path, playerId: profile.id, seq: Date.now() }
+        payload: { type: 'draw_path', aircraftId, path, playerId: authUserId, seq: Date.now() }
       });
       return;
     }
@@ -508,18 +514,18 @@ export default function App() {
       isDrawing: false,
     };
     play('draw_path');
-  }, [play, multiplayer, profile.id]);
+  }, [play, multiplayer, authUserId]);
 
   const handleAircraftSelected = useCallback((id: string | null) => {
     gameStateRef.current = { ...gameStateRef.current, selectedAircraftId: id };
   }, []);
 
   const handleHoldingToggle = useCallback((aircraftId: string) => {
-    if (multiplayer.room && multiplayer.room.host_id !== profile.id && multiplayer.channel) {
+    if (multiplayer.room && multiplayer.room.host_id !== authUserId && multiplayer.channel) {
       multiplayer.channel.send({
         type: 'broadcast',
         event: 'player_input',
-        payload: { type: 'holding_toggle', aircraftId, playerId: profile.id, seq: Date.now() }
+        payload: { type: 'holding_toggle', aircraftId, playerId: authUserId, seq: Date.now() }
       });
       return;
     }
@@ -535,14 +541,14 @@ export default function App() {
       }),
     };
     play('holding_toggle');
-  }, [play, multiplayer, profile.id]);
+  }, [play, multiplayer, authUserId]);
 
   const handleAltitudeChange = useCallback((aircraftId: string, altitude: 1 | 2 | 3) => {
-    if (multiplayer.room && multiplayer.room.host_id !== profile.id && multiplayer.channel) {
+    if (multiplayer.room && multiplayer.room.host_id !== authUserId && multiplayer.channel) {
       multiplayer.channel.send({
         type: 'broadcast',
         event: 'player_input',
-        payload: { type: 'altitude_change', aircraftId, altitude, playerId: profile.id, seq: Date.now() }
+        payload: { type: 'altitude_change', aircraftId, altitude, playerId: authUserId, seq: Date.now() }
       });
       return;
     }
@@ -555,14 +561,14 @@ export default function App() {
       }),
     };
     play('holding_toggle'); // Using holding_toggle as a generic UI click sound for now
-  }, [play, multiplayer, profile.id]);
+  }, [play, multiplayer, authUserId]);
 
   const handleRunwaySelect = useCallback((aircraftId: string, runwayId: string | null) => {
-    if (multiplayer.room && multiplayer.room.host_id !== profile.id && multiplayer.channel) {
+    if (multiplayer.room && multiplayer.room.host_id !== authUserId && multiplayer.channel) {
       multiplayer.channel.send({
         type: 'broadcast',
         event: 'player_input',
-        payload: { type: 'runway_select', aircraftId, runwayId, playerId: profile.id, seq: Date.now() }
+        payload: { type: 'runway_select', aircraftId, runwayId, playerId: authUserId, seq: Date.now() }
       });
       return;
     }
@@ -575,7 +581,7 @@ export default function App() {
       }),
     };
     play('holding_toggle');
-  }, [play, multiplayer, profile.id]);
+  }, [play, multiplayer, authUserId]);
 
   // ── Canvas ref bridge ─────────────────────────────────────
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -657,7 +663,7 @@ export default function App() {
           onContinue={handleContinue}
           onNewGame={handleGoToStageSelect}
           onSurvival={() => setScreen('survival_menu')}
-          onOnline={() => setScreen('online_menu')}
+          onOnline={handleGoOnline}
           onLeaderboard={() => setScreen('leaderboard')}
           onUnlockAllStages={handleUnlockAllStages}
           onLockAllStages={handleLockAllStages}
@@ -727,6 +733,7 @@ export default function App() {
         <OnlineMenu
           onBack={() => setScreen('menu')}
           username={profile.username}
+          multiplayer={multiplayer}
         />
       )}
 
@@ -734,9 +741,9 @@ export default function App() {
       {screen === 'lobby' && (
         <LobbyScreen
           multiplayer={multiplayer}
-          onBack={() => setScreen('menu')}
-          onStartGame={() => {}} // handled by useEffect
-          currentUserId={profile.id}
+          onBack={() => { multiplayer.leaveRoom(); setScreen('menu'); }}
+          onStartGame={() => {}}
+          currentUserId={authUserId}
         />
       )}
 

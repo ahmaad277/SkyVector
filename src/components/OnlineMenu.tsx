@@ -1,16 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMultiplayer, type MultiplayerMode } from '../hooks/useMultiplayer';
+
+import { getAuthErrorMessage } from '../supabase/authErrors';
 
 interface OnlineMenuProps {
   onBack: () => void;
   username: string;
+  multiplayer: ReturnType<typeof useMultiplayer>;
 }
 
-export default function OnlineMenu({ onBack, username }: OnlineMenuProps) {
-  const { createRoom, joinRoom, loading, isLoadingAuth, error } = useMultiplayer();
+export default function OnlineMenu({ onBack, username, multiplayer }: OnlineMenuProps) {
+  const { createRoom, joinRoom, loading, isLoadingAuth, error, prepareAuth } = multiplayer;
   const [joinCode, setJoinCode] = useState('');
   const [mode, setMode] = useState<MultiplayerMode>('coop_shared');
-  const level = 1; // Default level for now
+  const level = 1;
+
+  useEffect(() => {
+    void prepareAuth();
+  }, [prepareAuth]);
 
   const handleCreate = () => {
     createRoom(username, mode, level);
@@ -33,7 +40,7 @@ export default function OnlineMenu({ onBack, username }: OnlineMenuProps) {
             Connecting to server...
           </div>
         ) : error ? (
-          <div style={styles.error}>{error}</div>
+          <div style={styles.error}>{getAuthErrorMessage(error)}</div>
         ) : null}
         
         <div style={styles.section}>
