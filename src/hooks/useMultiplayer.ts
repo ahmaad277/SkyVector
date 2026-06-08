@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { supabase, isSupabaseReady, getSupabaseConfigMessage, supabaseConfigError } from '../supabase/client';
+import { supabase, isSupabaseReady, pingSupabase } from '../supabase/client';
 import { ensureAuthSession } from '../supabase/auth';
-import { getSupabaseConfigErrorMessage } from '../supabase/authErrors';
+import { getAuthErrorMessage } from '../supabase/authErrors';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export type MultiplayerMode = 'coop_shared' | 'coop_squad' | 'versus';
@@ -46,11 +46,6 @@ function extractErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-function getConfigErrorMessage(): string {
-  if (supabaseConfigError) return getSupabaseConfigErrorMessage(supabaseConfigError);
-  return getSupabaseConfigMessage() ?? 'Supabase not configured';
-}
-
 export function useMultiplayer() {
   const [room, setRoom] = useState<Room | null>(null);
   const [players, setPlayers] = useState<RoomPlayer[]>([]);
@@ -68,7 +63,7 @@ export function useMultiplayer() {
 
   const prepareAuth = useCallback(async (): Promise<string | null> => {
     if (!isSupabaseReady) {
-      setError(getConfigErrorMessage());
+      setError('Supabase configuration is invalid.');
       return null;
     }
     if (authUserId) return authUserId;
@@ -79,11 +74,17 @@ export function useMultiplayer() {
 
     authPromiseRef.current = (async () => {
       try {
+        const ping = await pingSupabase();
+        if (!ping.ok) {
+          throw new Error(ping.error ?? 'Cannot reach Supabase');
+        }
+
         const { id } = await ensureAuthSession();
         setAuthUserId(id);
         return id;
       } catch (err: unknown) {
-        setError(extractErrorMessage(err, 'Authentication failed'));
+        const raw = extractErrorMessage(err, 'Authentication failed');
+        setError(getAuthErrorMessage(raw));
         return null;
       } finally {
         setIsLoadingAuth(false);
@@ -153,7 +154,7 @@ export function useMultiplayer() {
 
   const createRoom = useCallback(async (username: string, mode: MultiplayerMode = 'coop_shared', level: number = 1) => {
     if (!isSupabaseReady) {
-      setError(getConfigErrorMessage());
+      setError('Supabase configuration is invalid.');
       return;
     }
     setLoading(true);
@@ -199,7 +200,8 @@ export function useMultiplayer() {
       setPlayers([playerData]);
       joinRealtimeChannel(roomData);
     } catch (err: unknown) {
-      setError(extractErrorMessage(err, 'Failed to create room'));
+      const raw = extractErrorMessage(err, 'Failed to create room');
+      setError(getAuthErrorMessage(raw));
     } finally {
       setLoading(false);
     }
@@ -207,7 +209,7 @@ export function useMultiplayer() {
 
   const joinRoom = useCallback(async (code: string, username: string) => {
     if (!isSupabaseReady) {
-      setError(getConfigErrorMessage());
+      setError('Supabase configuration is invalid.');
       return;
     }
     setLoading(true);
@@ -258,7 +260,8 @@ export function useMultiplayer() {
       setPlayers([...existingPlayers, playerData]);
       joinRealtimeChannel(roomData);
     } catch (err: unknown) {
-      setError(extractErrorMessage(err, 'Failed to join room'));
+      const raw = extractErrorMessage(err, 'Failed to join room');
+      setError(getAuthErrorMessage(raw));
     } finally {
       setLoading(false);
     }

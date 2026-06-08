@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useMultiplayer, type MultiplayerMode } from '../hooks/useMultiplayer';
 
-import { getAuthErrorMessage } from '../supabase/authErrors';
-
 interface OnlineMenuProps {
   onBack: () => void;
   username: string;
@@ -40,7 +38,7 @@ export default function OnlineMenu({ onBack, username, multiplayer }: OnlineMenu
             Connecting to server...
           </div>
         ) : error ? (
-          <div style={styles.error}>{getAuthErrorMessage(error)}</div>
+          <div style={styles.error}>{error}</div>
         ) : null}
         
         <div style={styles.section}>

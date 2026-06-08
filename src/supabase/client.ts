@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { DEFAULT_SUPABASE_ANON_KEY, DEFAULT_SUPABASE_URL } from './defaults';
 
 function readEnv(name: string): string {
@@ -36,44 +36,66 @@ function isValidAnonKey(key: string): boolean {
   return key.startsWith('eyJ') && key.split('.').length === 3;
 }
 
-const SUPABASE_URL = normalizeSupabaseUrl(readEnv('VITE_SUPABASE_URL') || DEFAULT_SUPABASE_URL);
-const SUPABASE_ANON_KEY = readEnv('VITE_SUPABASE_ANON_KEY') || DEFAULT_SUPABASE_ANON_KEY;
+/** Prefer valid env vars; fall back to baked-in project defaults. */
+function resolveSupabaseConfig() {
+  const envUrl = normalizeSupabaseUrl(readEnv('VITE_SUPABASE_URL'));
+  const envKey = readEnv('VITE_SUPABASE_ANON_KEY');
 
-export type SupabaseConfigError = 'missing_env' | 'invalid_url' | 'invalid_key';
+  const url =
+    envUrl && isValidSupabaseUrl(envUrl) ? envUrl : DEFAULT_SUPABASE_URL;
+  const anonKey =
+    envKey && isValidAnonKey(envKey) ? envKey : DEFAULT_SUPABASE_ANON_KEY;
 
-export const supabaseConfigError: SupabaseConfigError | null =
-  !SUPABASE_URL || !SUPABASE_ANON_KEY
-    ? 'missing_env'
-    : !isValidSupabaseUrl(SUPABASE_URL)
-      ? 'invalid_url'
-      : !isValidAnonKey(SUPABASE_ANON_KEY)
-        ? 'invalid_key'
-        : null;
+  const usingDefaults =
+    url === DEFAULT_SUPABASE_URL || anonKey === DEFAULT_SUPABASE_ANON_KEY;
 
-export const isSupabaseReady = supabaseConfigError === null;
+  if (envUrl && !isValidSupabaseUrl(envUrl)) {
+    console.warn('[SkyVector] Ignoring invalid VITE_SUPABASE_URL, using project default.');
+  }
+  if (envKey && !isValidAnonKey(envKey)) {
+    console.warn('[SkyVector] Ignoring invalid VITE_SUPABASE_ANON_KEY, using project default.');
+  }
 
-if (supabaseConfigError) {
-  console.warn(
-    '[SkyVector] Supabase config invalid:',
-    supabaseConfigError,
-    'Set VITE_SUPABASE_URL=https://xxxx.supabase.co and VITE_SUPABASE_ANON_KEY in .env.local or Vercel env vars.'
-  );
+  return { url, anonKey, usingDefaults };
 }
 
-export const supabase = createClient(
-  isSupabaseReady ? SUPABASE_URL : 'https://placeholder.supabase.co',
-  isSupabaseReady ? SUPABASE_ANON_KEY : 'placeholder'
-);
+const resolved = resolveSupabaseConfig();
+
+export const SUPABASE_URL = resolved.url;
+export const SUPABASE_ANON_KEY = resolved.anonKey;
+export const isSupabaseReady = isValidSupabaseUrl(SUPABASE_URL) && isValidAnonKey(SUPABASE_ANON_KEY);
+
+export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
+
+/** Lightweight connectivity check (rooms table is public read). */
+export async function pingSupabase(): Promise<{ ok: boolean; error?: string }> {
+  if (!isSupabaseReady) {
+    return { ok: false, error: 'Supabase client not configured' };
+  }
+  try {
+    const { error } = await supabase.from('rooms').select('id').limit(1);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (err: unknown) {
+    return { ok: false, error: extractErrorMessage(err) };
+  }
+}
+
+function extractErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object' && 'message' in err) {
+    return String((err as { message: string }).message);
+  }
+  return 'Network error';
+}
 
 export function getSupabaseConfigMessage(): string | null {
-  switch (supabaseConfigError) {
-    case 'missing_env':
-      return 'Supabase env vars missing (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY).';
-    case 'invalid_url':
-      return 'Invalid Supabase URL. Use https://YOUR_PROJECT.supabase.co';
-    case 'invalid_key':
-      return 'Invalid Supabase anon key. Copy the anon public key from Supabase → Settings → API.';
-    default:
-      return null;
-  }
+  if (isSupabaseReady) return null;
+  return 'Supabase configuration is invalid.';
 }
