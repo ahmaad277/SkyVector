@@ -15,6 +15,8 @@ interface LevelCompleteScreenProps {
   onMenu: () => void;
   onSubmitScore?: () => void;
   submitting?: boolean;
+  isCoopWin?: boolean;
+  onLobby?: () => void;
 }
 
 export default function LevelCompleteScreen({
@@ -25,30 +27,42 @@ export default function LevelCompleteScreen({
   onMenu,
   onSubmitScore,
   submitting,
+  isCoopWin = false,
+  onLobby,
 }: LevelCompleteScreenProps) {
-  const isFinalLevel = level >= LEVELS.length;
+  const isFinalLevel = !isCoopWin && level >= LEVELS.length;
 
   return (
     <div style={styles.overlay}>
       <div style={styles.container}>
-        <div style={styles.glitchText}>{isFinalLevel ? 'CAMPAIGN COMPLETE' : 'STAGE CLEARED'}</div>
+        <div style={styles.glitchText}>
+          {isCoopWin ? 'TEAM VICTORY' : isFinalLevel ? 'CAMPAIGN COMPLETE' : 'STAGE CLEARED'}
+        </div>
         
-        <h2 style={styles.levelText}>SECTOR {level} SECURED</h2>
+        <h2 style={styles.levelText}>
+          {isCoopWin ? 'CO-OP MISSION COMPLETE' : `SECTOR ${level} SECURED`}
+        </h2>
         
         <p style={styles.message}>
-          {isFinalLevel 
+          {isCoopWin
+            ? 'Landing target reached. Excellent teamwork, controllers.'
+            : isFinalLevel 
             ? "Congratulations! You have completed all sectors."
             : "Airspace secured. Get ready for the next sector."}
         </p>
 
         <div style={styles.statsGrid}>
           <div style={styles.statBox}>
-            <div style={styles.statLabel}>FINAL SCORE</div>
+            <div style={styles.statLabel}>{isCoopWin ? 'TEAM SCORE' : 'FINAL SCORE'}</div>
             <div style={styles.statValue}>{score.toLocaleString()}</div>
           </div>
           <div style={styles.statBox}>
             <div style={styles.statLabel}>PERFECT LANDINGS</div>
             <div style={styles.statValue}>{stats.perfectLandings}</div>
+          </div>
+          <div style={styles.statBox}>
+            <div style={styles.statLabel}>TIME BONUSES</div>
+            <div style={styles.statValue}>{stats.totalTimeBonuses}</div>
           </div>
           <div style={styles.statBox}>
             <div style={styles.statLabel}>FASTEST LANDING</div>
@@ -57,12 +71,17 @@ export default function LevelCompleteScreen({
         </div>
 
         <div style={styles.buttons}>
-          {!isFinalLevel && (
+          {isCoopWin && onLobby && (
+            <button style={styles.btnPrimary} onClick={onLobby}>
+              BACK TO LOBBY
+            </button>
+          )}
+          {!isCoopWin && !isFinalLevel && (
             <button style={styles.btnPrimary} onClick={onNextLevel}>
               NEXT STAGE
             </button>
           )}
-          {isFinalLevel && onSubmitScore && (
+          {(isFinalLevel || isCoopWin) && onSubmitScore && (
             <button style={styles.btnPrimary} onClick={onSubmitScore} disabled={submitting}>
               {submitting ? 'SUBMITTING...' : 'SUBMIT TO LEADERBOARD'}
             </button>

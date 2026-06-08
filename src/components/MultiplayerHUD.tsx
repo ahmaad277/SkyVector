@@ -16,7 +16,7 @@ export default function MultiplayerHUD({
   lives,
   score,
 }: MultiplayerHUDProps) {
-  const { room, players, playerScores, playerLandings, matchStartedAt } = multiplayerState;
+  const { room, players, playerScores, playerLandings, playerLives, matchStartedAt } = multiplayerState;
   const elapsed = Date.now() - matchStartedAt;
   const versusRemaining = Math.max(0, VERSUS_MATCH_MS - elapsed);
 
@@ -37,17 +37,25 @@ export default function MultiplayerHUD({
         </div>
       )}
       <div style={styles.players}>
-        {players.map((p) => (
-          <span key={p.id} style={{ ...styles.chip, borderColor: resolvePlayerColor(p.color), color: resolvePlayerColor(p.color) }}>
+        {players.map((p) => {
+          const eliminated = (playerLives[p.player_id] ?? 0) <= 0;
+          return (
+          <span key={p.id} style={{
+            ...styles.chip,
+            borderColor: resolvePlayerColor(p.color),
+            color: resolvePlayerColor(p.color),
+            opacity: eliminated ? 0.45 : 1,
+          }}>
             {p.username}
             {room.mode === 'versus'
-              ? ` ${playerLandings[p.player_id] ?? 0}/${VERSUS_LANDING_GOAL}`
+              ? ` ♥${playerLives[p.player_id] ?? 0} · ${playerLandings[p.player_id] ?? 0}/${VERSUS_LANDING_GOAL}`
               : room.mode === 'coop_squad'
                 ? ` (${playerLandings[p.player_id] ?? 0})`
                 : ''}
             {room.mode === 'versus' ? ` · ${(playerScores[p.player_id] ?? 0).toLocaleString()}` : ''}
+            {eliminated ? ' OUT' : ''}
           </span>
-        ))}
+        );})}
       </div>
     </div>
   );

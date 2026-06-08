@@ -81,6 +81,12 @@ export default function HUD({
         lives={lives}
       />
 
+      {level >= 2 && (
+        <div style={styles.collisionTip}>
+          Collisions cost 2 lives — vector carefully
+        </div>
+      )}
+
       {/* Event Banner */}
       {activeEvent && (
         <div
@@ -141,6 +147,12 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(255,0,60,0.12)',
     border: '1px solid rgba(255,0,60,0.4)',
     borderRadius: 4,
+  },
+  collisionTip: {
+    padding: '2px 10px',
+    fontSize: 'clamp(9px, 2.5vw, 10px)',
+    color: 'rgba(255,215,0,0.75)',
+    letterSpacing: 0.5,
   },
   eventText: {
     color: COLORS.HUD_DANGER,

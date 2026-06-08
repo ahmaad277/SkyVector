@@ -64,6 +64,11 @@ export default function OnboardingOverlay({ onComplete, onDismiss }: OnboardingO
   const [step, setStep] = useState(0);
   const currentStep = tutorialSteps[step];
 
+  const dismiss = useCallback(() => {
+    markTutorialSeen();
+    onDismiss();
+  }, [onDismiss]);
+
   const next = useCallback(() => {
     if (step < tutorialSteps.length - 1) {
       setStep(s => s + 1);
@@ -81,15 +86,15 @@ export default function OnboardingOverlay({ onComplete, onDismiss }: OnboardingO
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' || e.key === 'Enter') next();
       if (e.key === 'ArrowLeft') prev();
-      if (e.key === 'Escape') onDismiss();
+      if (e.key === 'Escape') dismiss();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [next, prev, onDismiss]);
+  }, [next, prev, dismiss]);
 
   return (
     <div style={styles.overlay}>
-      <div style={styles.backdrop} onClick={onDismiss} />
+      <div style={styles.backdrop} onClick={dismiss} />
       <div style={styles.card}>
         {/* Step counter */}
         <div style={styles.stepCounter}>
@@ -106,15 +111,17 @@ export default function OnboardingOverlay({ onComplete, onDismiss }: OnboardingO
 
         {/* Content */}
         <div style={styles.content}>
-          <div style={styles.stepNumber}>STEP {step + 1} OF {tutorialSteps.length}</div>
           <h2 style={styles.title}>{currentStep.title}</h2>
           <p style={styles.description}>{currentStep.description}</p>
+          {step === 1 && (
+            <p style={styles.spotlightHint}>Tip: the radar canvas is the large green display during gameplay.</p>
+          )}
         </div>
 
         {/* Actions */}
         <div style={styles.actions}>
           <button
-            onClick={onDismiss}
+            onClick={dismiss}
             style={styles.skipBtn}
           >
             SKIP TUTORIAL
@@ -201,6 +208,16 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'rgba(255,255,255,0.75)',
     lineHeight: 1.6,
     margin: 0,
+  },
+  spotlightHint: {
+    marginTop: 8,
+    padding: '8px 10px',
+    borderRadius: 8,
+    border: '1px solid rgba(0,240,255,0.35)',
+    background: 'rgba(0,240,255,0.08)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    color: '#00F0FF',
   },
   actions: {
     display: 'flex',

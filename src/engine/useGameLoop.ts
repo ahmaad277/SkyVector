@@ -12,7 +12,7 @@ import {
 import { LEVELS } from '../levels';
 import { getLandingTargetForLevel } from '../utils/levelProgress';
 import { getSurvivalLevelConfig, processSurvivalLanding, expireBuffs, hasBuff, consumeIronShield, generatePowerUpChoices } from './SurvivalEngine';
-import { applyPlayerInput, pickSpawnOwner, recordMultiplayerLanding, checkMultiplayerMatchEnd } from './MultiplayerEngine';
+import { applyPlayerInput, pickSpawnOwner, recordMultiplayerLanding, checkMultiplayerMatchEnd, applyVersusPlayerDamage, getAircraftOwnerId, getVersusWinnerByElimination, type MatchEndResult } from './MultiplayerEngine';
 
 interface UseGameLoopOptions {
   gameStateRef: React.MutableRefObject<GameState>;
@@ -24,7 +24,9 @@ interface UseGameLoopOptions {
   onEventTriggered: (event: GameState['activeEvent']) => void;
   onLanding: (callsign: string, isNORDO: boolean, isEmergency: boolean) => void;
   onSurvivalRoundComplete?: () => void;
-  onMultiplayerMatchEnd?: (result: import('./MultiplayerEngine').MatchEndResult) => void;
+  onMultiplayerMatchEnd?: (result: MatchEndResult) => void;
+  onFuelLoss?: () => void;
+  onOutOfBounds?: () => void;
   renderFrame: (state: GameState, canvas: HTMLCanvasElement) => void;
 }
 
@@ -40,6 +42,8 @@ export function useGameLoop(options: UseGameLoopOptions) {
     onLanding,
     onSurvivalRoundComplete,
     onMultiplayerMatchEnd,
+    onFuelLoss,
+    onOutOfBounds,
     renderFrame,
   } = options;
 
@@ -190,9 +194,75 @@ export function useGameLoop(options: UseGameLoopOptions) {
       // ── Check for fuel crashes and VIP/Mayday delays ────────
       const isInvulnerable = newState.invulnerableUntil ? now < newState.invulnerableUntil : false;
 
-      const handleDamage = (reason: 'collision' | 'fuel' | 'vip_delay', amount: number = 1) => {
+      const finishMultiplayerMatch = (result: MatchEndResult) => {
+        isRunningRef.current = false;
+        newState.multiplayerState = {
+          ...newState.multiplayerState!,
+          matchEnded: true,
+          winnerId: result.winnerId,
+        };
+        gameStateRef.current = { ...newState, phase: 'gameover' };
+        renderFrame(gameStateRef.current, canvas);
+        onMultiplayerMatchEnd?.(result);
+      };
+
+      const handleDamage = (
+        reason: 'collision' | 'fuel' | 'vip_delay' | 'out_of_bounds',
+        amount: number = 1,
+        sourceAircraftId?: string
+      ) => {
         if (isInvulnerable) return false;
-        
+
+        if (reason === 'fuel') {
+          onFuelLoss?.();
+        }
+
+        const mp = newState.multiplayerState;
+
+        if (mp?.room.mode === 'versus') {
+          const ownerId =
+            (sourceAircraftId ? getAircraftOwnerId(newState, sourceAircraftId) : null) ??
+            mp.me.player_id;
+          newState = applyVersusPlayerDamage(newState, ownerId, amount);
+          const livesLeft = newState.multiplayerState!.playerLives[ownerId] ?? 0;
+
+          const eliminationWinner = getVersusWinnerByElimination(newState);
+          if (eliminationWinner && mp.players.length > 1) {
+            finishMultiplayerMatch({
+              reason: 'versus_landings',
+              winnerId: eliminationWinner,
+              playerScores: newState.multiplayerState!.playerScores,
+            });
+            return true;
+          }
+
+          if (livesLeft <= 0 && mp.players.every((p) => (newState.multiplayerState!.playerLives[p.player_id] ?? 0) <= 0)) {
+            finishMultiplayerMatch({
+              reason: 'versus_time',
+              winnerId: null,
+              playerScores: newState.multiplayerState!.playerScores,
+            });
+            return true;
+          }
+
+          newState.invulnerableUntil = now + 2000;
+          return false;
+        }
+
+        if (mp) {
+          newState.lives -= amount;
+          if (newState.lives <= 0) {
+            finishMultiplayerMatch({
+              reason: 'coop_gameover',
+              winnerId: null,
+              playerScores: mp.playerScores,
+            });
+            return true;
+          }
+          newState.invulnerableUntil = now + 2000;
+          return false;
+        }
+
         if (isSurvival && newState.survivalState) {
           if (hasBuff(newState.survivalState, 'IRON_SHIELD')) {
             newState.survivalState = consumeIronShield(newState.survivalState);
@@ -208,12 +278,12 @@ export function useGameLoop(options: UseGameLoopOptions) {
             return true;
           }
         } else {
-          newState.lives -= 1;
+          newState.lives -= amount;
           if (newState.lives <= 0) {
             isRunningRef.current = false;
-            gameStateRef.current = { ...newState, phase: 'gameover', gameOverReason: reason };
+            gameStateRef.current = { ...newState, phase: 'gameover', gameOverReason: reason === 'out_of_bounds' ? 'collision' : reason };
             renderFrame(gameStateRef.current, canvas);
-            onGameOver(newState.score, maxComboRef.current, reason);
+            onGameOver(newState.score, maxComboRef.current, reason === 'out_of_bounds' ? 'collision' : reason);
             return true;
           }
         }
@@ -223,8 +293,7 @@ export function useGameLoop(options: UseGameLoopOptions) {
 
       const fuelCrashed = newState.aircraft.find(a => a.state === 'crashed' && a.fuel <= 0);
       if (fuelCrashed) {
-        if (handleDamage('fuel', 1)) return;
-        // Remove the crashed aircraft so it doesn't keep triggering
+        if (handleDamage('fuel', 1, fuelCrashed.id)) return;
         newState.aircraft = newState.aircraft.filter(a => a.id !== fuelCrashed.id);
       }
 
@@ -245,7 +314,7 @@ export function useGameLoop(options: UseGameLoopOptions) {
       });
 
       if (delayedVIPOrMayday) {
-        if (handleDamage('vip_delay', 1)) return;
+        if (handleDamage('vip_delay', 1, delayedVIPOrMayday.id)) return;
         newState.aircraft = newState.aircraft.filter(a => a.id !== delayedVIPOrMayday.id);
       }
 
@@ -262,7 +331,7 @@ export function useGameLoop(options: UseGameLoopOptions) {
       if (collision && colliderIds) {
         newState.collisions += 1;
         newState.screenShakeUntil = now + 300;
-        if (handleDamage('collision', 2)) {
+        if (handleDamage('collision', 2, colliderIds[0])) {
           newState.aircraft = newState.aircraft.map((a) =>
             colliderIds.includes(a.id) ? { ...a, state: 'crashed' } : a
           );
@@ -272,8 +341,10 @@ export function useGameLoop(options: UseGameLoopOptions) {
         newState.aircraft = newState.aircraft.filter(a => !colliderIds.includes(a.id));
       }
 
-      // Remove out-of-bounds aircraft silently
+      // Out-of-bounds — apply penalty instead of silent removal
       if (outOfBoundsIds.length > 0) {
+        onOutOfBounds?.();
+        if (handleDamage('out_of_bounds', 1, outOfBoundsIds[0])) return;
         newState.aircraft = newState.aircraft.filter(
           (a) => !outOfBoundsIds.includes(a.id)
         );
@@ -460,7 +531,7 @@ export function useGameLoop(options: UseGameLoopOptions) {
       renderFrame(newState, canvas);
       rafRef.current = requestAnimationFrame(tick);
     },
-    [gameStateRef, canvasRef, onScoreUpdate, onComboUpdate, onGameOver, onLevelComplete, onEventTriggered, onLanding, onSurvivalRoundComplete, onMultiplayerMatchEnd, renderFrame]
+    [gameStateRef, canvasRef, onScoreUpdate, onComboUpdate, onGameOver, onLevelComplete, onEventTriggered, onLanding, onSurvivalRoundComplete, onMultiplayerMatchEnd, onFuelLoss, onOutOfBounds, renderFrame]
   );
 
   const start = useCallback(() => {

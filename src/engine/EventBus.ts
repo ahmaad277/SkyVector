@@ -5,8 +5,11 @@ const EVENT_INTERVAL_MS = 30_000;    // 30 seconds between events
 const EVENT_DURATION_MS = 20_000;    // most events last 20 seconds
 
 export function shouldTriggerEvent(state: GameState, now: number): boolean {
-  if (state.level < 2) return false;           // no events on tutorial
   if (state.activeEvent !== null) return false;
+  const eventsEnabled = state.survivalState
+    ? state.survivalState.round >= 2
+    : state.level >= 2;
+  if (!eventsEnabled) return false;
   return now >= state.nextEventTime;
 }
 

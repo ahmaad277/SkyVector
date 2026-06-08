@@ -56,6 +56,8 @@ export function useMultiplayer() {
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const roomRef = useRef<Room | null>(null);
   const authPromiseRef = useRef<Promise<string | null> | null>(null);
+  const gameChannelRef = useRef<RealtimeChannel | null>(null);
+  const [gameChannel, setGameChannel] = useState<RealtimeChannel | null>(null);
 
   useEffect(() => {
     roomRef.current = room;
@@ -111,11 +113,33 @@ export function useMultiplayer() {
     };
   }, []);
 
+  const closeGameChannel = useCallback(() => {
+    if (gameChannelRef.current) {
+      supabase.removeChannel(gameChannelRef.current);
+      gameChannelRef.current = null;
+      setGameChannel(null);
+    }
+  }, []);
+
+  const openGameChannel = useCallback((roomCode: string) => {
+    closeGameChannel();
+    const ch = supabase.channel(`room:${roomCode}:game`);
+    ch.subscribe((status, err) => {
+      if (status === 'CHANNEL_ERROR') {
+        console.warn('[Multiplayer] Game channel error:', err);
+      }
+    });
+    gameChannelRef.current = ch;
+    setGameChannel(ch);
+    return ch;
+  }, [closeGameChannel]);
+
   const joinRealtimeChannel = useCallback((roomData: Room) => {
     try {
       if (channel) {
         supabase.removeChannel(channel);
       }
+      closeGameChannel();
 
       const newChannel = supabase.channel(`room:${roomData.code}`);
 
@@ -150,7 +174,7 @@ export function useMultiplayer() {
     } catch (err) {
       console.warn('[Multiplayer] Failed to subscribe to realtime updates:', err);
     }
-  }, [channel]);
+  }, [channel, closeGameChannel]);
 
   const createRoom = useCallback(async (username: string, mode: MultiplayerMode = 'coop_shared', level: number = 1) => {
     if (!isSupabaseReady) {
@@ -282,12 +306,13 @@ export function useMultiplayer() {
         supabase.removeChannel(channel);
         setChannel(null);
       }
+      closeGameChannel();
       setRoom(null);
       setPlayers([]);
     } catch (err) {
       console.error('Error leaving room:', err);
     }
-  }, [channel]);
+  }, [channel, closeGameChannel]);
 
   const updateReadyStatus = useCallback(async (isReady: boolean) => {
     const currentRoom = roomRef.current;
@@ -333,6 +358,32 @@ export function useMultiplayer() {
     }
   }, []);
 
+  const resetRoomForRematch = useCallback(async () => {
+    const currentRoom = roomRef.current;
+    if (!currentRoom || !isSupabaseReady) return false;
+    try {
+      const { id: userId } = await ensureAuthSession();
+      if (userId !== currentRoom.host_id) return false;
+
+      const newSeed = Math.floor(Math.random() * 1_000_000);
+      const { error: roomError } = await supabase
+        .from('rooms')
+        .update({ status: 'lobby', seed: newSeed })
+        .eq('id', currentRoom.id);
+      if (roomError) throw roomError;
+
+      await supabase
+        .from('room_players')
+        .update({ is_ready: false })
+        .eq('room_id', currentRoom.id);
+
+      return true;
+    } catch (err) {
+      console.error('Error resetting room:', err);
+      return false;
+    }
+  }, []);
+
   return {
     room,
     players,
@@ -346,7 +397,11 @@ export function useMultiplayer() {
     updateReadyStatus,
     startGame,
     finishMatch,
+    resetRoomForRematch,
     channel,
+    gameChannel,
+    openGameChannel,
+    closeGameChannel,
     prepareAuth,
   };
 }

@@ -49,9 +49,9 @@ export default function DailyMissionsPanel({ missions }: DailyMissionsPanelProps
         zIndex: 50,
       }}>
         <div style={{ fontSize: 10, color: '#00F0FF', fontWeight: 'bold', marginBottom: 6, letterSpacing: 1 }}>
-          ACTIVE MISSION
+          DAILY MISSIONS
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 120, overflowY: 'auto' }}>
           {missions.map(m => (
             <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <div style={{ fontSize: 9, color: m.completed ? '#39FF14' : 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={m.description}>

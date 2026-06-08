@@ -21,6 +21,8 @@ interface RadarScreenProps {
   onHoldingToggle: (aircraftId: string) => void;
   onAltitudeChange: (aircraftId: string, altitude: 1 | 2 | 3) => void;
   onRunwaySelect: (aircraftId: string, runwayId: string | null) => void;
+  canControlAircraft?: (aircraftId: string) => boolean;
+  onControlDenied?: () => void;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
 }
 
@@ -31,6 +33,8 @@ export default function RadarScreen({
   onHoldingToggle,
   onAltitudeChange,
   onRunwaySelect,
+  canControlAircraft,
+  onControlDenied,
   onCanvasReady,
 }: RadarScreenProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -135,6 +139,10 @@ export default function RadarScreen({
     const ac = findAircraftAt(pos);
 
     if (ac && !ac.isNORDO) {
+      if (canControlAircraft && !canControlAircraft(ac.id)) {
+        onControlDenied?.();
+        return;
+      }
       // Double-click = toggle holding
       const now = Date.now();
       if (lastTapRef.current.id === ac.id && now - lastTapRef.current.time < 350) {
@@ -150,7 +158,7 @@ export default function RadarScreen({
       onAircraftSelected(null);
       drawingRef.current = { active: false, points: [], aircraftId: null };
     }
-  }, [gameStateRef, findAircraftAt, getPos, onAircraftSelected, onHoldingToggle, onAltitudeChange, onRunwaySelect]);
+  }, [gameStateRef, findAircraftAt, getPos, onAircraftSelected, onHoldingToggle, onAltitudeChange, onRunwaySelect, canControlAircraft, onControlDenied]);
 
   const onMouseMove = useCallback((e: MouseEvent) => {
     if (!drawingRef.current.active) return;
@@ -218,6 +226,10 @@ export default function RadarScreen({
     const ac = findAircraftAt(pos);
 
     if (ac && !ac.isNORDO) {
+      if (canControlAircraft && !canControlAircraft(ac.id)) {
+        onControlDenied?.();
+        return;
+      }
       const now = Date.now();
       if (lastTapRef.current.id === ac.id && now - lastTapRef.current.time < 350) {
         onHoldingToggle(ac.id);
@@ -228,7 +240,7 @@ export default function RadarScreen({
       drawingRef.current = { active: true, points: [pos], aircraftId: ac.id };
       onAircraftSelected(ac.id);
     }
-  }, [gameStateRef, findAircraftAt, getPos, onAircraftSelected, onHoldingToggle, onAltitudeChange, onRunwaySelect]);
+  }, [gameStateRef, findAircraftAt, getPos, onAircraftSelected, onHoldingToggle, onAltitudeChange, onRunwaySelect, canControlAircraft, onControlDenied]);
 
   const onTouchMove = useCallback((e: TouchEvent) => {
     e.preventDefault();

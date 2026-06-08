@@ -14,6 +14,8 @@ interface GameOverScreenProps {
   onMenu: () => void;
   onSubmitScore?: () => void;
   submitting?: boolean;
+  teamFailure?: boolean;
+  onLobby?: () => void;
 }
 
 export default function GameOverScreen({
@@ -28,24 +30,29 @@ export default function GameOverScreen({
   onMenu,
   onSubmitScore,
   submitting = false,
+  teamFailure = false,
+  onLobby,
 }: GameOverScreenProps) {
   return (
     <div style={styles.overlay}>
       <div style={styles.card}>
-        {/* Collision animation */}
         <div style={styles.crashIcon}>
-          {reason === 'fuel' ? '⛽' : reason === 'vip_delay' ? '⏱️' : '💥'}
+          {teamFailure ? '🛡️' : reason === 'fuel' ? '⛽' : reason === 'vip_delay' ? '⏱️' : '💥'}
         </div>
 
         <h1 style={styles.title}>
-          {reason === 'fuel'
+          {teamFailure
+            ? 'TEAM FAILED'
+            : reason === 'fuel'
             ? 'OUT OF FUEL'
             : reason === 'vip_delay'
             ? 'CRITICAL DELAY'
             : 'MID-AIR COLLISION'}
         </h1>
         <p style={styles.sub}>
-          {reason === 'fuel'
+          {teamFailure
+            ? 'Shared lives depleted. The team could not secure the airspace.'
+            : reason === 'fuel'
             ? 'An aircraft ran out of fuel.'
             : reason === 'vip_delay'
             ? 'VIP / Mayday flight delayed too long.'
@@ -69,9 +76,15 @@ export default function GameOverScreen({
 
         {/* Actions */}
         <div style={styles.btnRow}>
-          <button style={styles.btnPrimary} onClick={onRestart}>
-            ↺ RETRY
-          </button>
+          {teamFailure && onLobby ? (
+            <button style={styles.btnPrimary} onClick={onLobby}>
+              BACK TO LOBBY
+            </button>
+          ) : (
+            <button style={styles.btnPrimary} onClick={onRestart}>
+              ↺ RETRY
+            </button>
+          )}
           <button style={styles.btnSecondary} onClick={onMenu}>
             ⌂ MENU
           </button>

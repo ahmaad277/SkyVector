@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { PowerUp } from '../types/survival.types';
 
 interface SurvivalRoundCompleteProps {
@@ -8,12 +8,21 @@ interface SurvivalRoundCompleteProps {
 }
 
 export default function SurvivalRoundComplete({ round, choices, onSelect }: SurvivalRoundCompleteProps) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const idx = e.key === '1' ? 0 : e.key === '2' ? 1 : e.key === '3' ? 2 : -1;
+      if (idx >= 0 && choices[idx]) onSelect(choices[idx]);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [choices, onSelect]);
+
   return (
     <div style={styles.overlay}>
       <div style={styles.card}>
         <div style={styles.badge}>ROUND {round - 1} CLEARED</div>
         <h2 style={styles.title}>SELECT POWER-UP</h2>
-        <p style={styles.subtitle}>Choose one upgrade for the next round</p>
+        <p style={styles.subtitle}>Choose one upgrade for the next round (keys 1–3)</p>
 
         <div style={styles.choices}>
           {choices.map((choice) => (

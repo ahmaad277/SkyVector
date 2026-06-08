@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMultiplayer } from '../hooks/useMultiplayer';
-import { requiresMinTwoPlayers } from '../engine/MultiplayerEngine';
+import { requiresMinTwoPlayers, resolvePlayerColor, getModeDescription } from '../engine/MultiplayerEngine';
+import { getLandingTargetForLevel } from '../utils/levelProgress';
 
 interface LobbyScreenProps {
   multiplayer: ReturnType<typeof useMultiplayer>;
@@ -71,15 +72,20 @@ export default function LobbyScreen({ multiplayer, onBack, onStartGame, currentU
           </div>
         </div>
 
+        <div style={styles.roomInfo}>
+          <span>Level {room.level} · Target {getLandingTargetForLevel(room.level)} landings</span>
+          <span style={{ opacity: 0.7 }}>{getModeDescription(room.mode)}</span>
+        </div>
+
         <div style={styles.playersList}>
           {players.map(p => (
             <div key={p.id} style={{
               ...styles.playerRow,
-              borderLeft: `4px solid ${p.color}`,
+              borderLeft: `4px solid ${resolvePlayerColor(p.color)}`,
               background: p.player_id === currentUserId ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.3)'
             }}>
               <div style={styles.playerInfo}>
-                <span style={{ color: p.color, fontWeight: 'bold' }}>{p.username}</span>
+                <span style={{ color: resolvePlayerColor(p.color), fontWeight: 'bold' }}>{p.username}</span>
                 {p.player_id === room.host_id && <span style={styles.hostBadge}>HOST</span>}
               </div>
               <div style={{
@@ -183,6 +189,19 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-mono)',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  roomInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    padding: '10px 12px',
+    borderRadius: 8,
+    background: 'rgba(0,240,255,0.05)',
+    border: '1px solid rgba(0,240,255,0.15)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.7)',
+    lineHeight: 1.45,
   },
   copyBtn: {
     padding: '4px 10px',

@@ -9,6 +9,9 @@ interface SurvivalModeScreenProps {
 }
 
 export default function SurvivalModeScreen({ onStart, onBack }: SurvivalModeScreenProps) {
+  const bestRound = parseInt(localStorage.getItem('skyvector_survival_best_round') ?? '0', 10);
+  const bestScore = parseInt(localStorage.getItem('skyvector_survival_best_score') ?? '0', 10);
+
   return (
     <div style={styles.root}>
       <GridBackground accentColor="#FF003C" opacity={0.03} />
@@ -39,7 +42,7 @@ export default function SurvivalModeScreen({ onStart, onBack }: SurvivalModeScre
               <span style={styles.featureIcon}>⚡</span>
               <div>
                 <div style={styles.featureTitle}>POWER-UPS</div>
-                <div style={styles.featureDesc}>Land 3 of the same aircraft type in a row to trigger special abilities.</div>
+                <div style={styles.featureDesc}>Clear each round to pick 1 of 3 upgrades. Type streaks and combo x5 grant bonus buffs.</div>
               </div>
             </div>
             <div style={styles.feature}>
@@ -50,6 +53,13 @@ export default function SurvivalModeScreen({ onStart, onBack }: SurvivalModeScre
               </div>
             </div>
           </div>
+
+          {(bestRound > 0 || bestScore > 0) && (
+            <div style={styles.records}>
+              {bestRound > 0 && <span>BEST ROUND: {bestRound}</span>}
+              {bestScore > 0 && <span>BEST SCORE: {bestScore.toLocaleString()}</span>}
+            </div>
+          )}
 
           <Button
             variant="danger"
@@ -158,5 +168,19 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 'clamp(9px, 2.5vw, 11px)',
     color: 'rgba(255,255,255,0.5)',
     lineHeight: 1.4,
+  },
+  records: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: 8,
+    border: '1px solid rgba(255,215,0,0.25)',
+    background: 'rgba(255,215,0,0.06)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    color: '#FFD700',
+    textAlign: 'center',
   },
 };

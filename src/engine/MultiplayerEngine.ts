@@ -84,10 +84,56 @@ export function createMultiplayerState(
 export function pickSpawnOwner(state: MultiplayerState): string | null {
   const mode = state.room.mode;
   if (mode === 'coop_shared') return null;
-  if (state.players.length === 0) return state.me.player_id;
-  const idx = state.spawnCounter % state.players.length;
+
+  const eligible =
+    mode === 'versus'
+      ? state.players.filter((p) => (state.playerLives[p.player_id] ?? 0) > 0)
+      : state.players;
+
+  if (eligible.length === 0) return state.me.player_id;
+  const idx = state.spawnCounter % eligible.length;
   state.spawnCounter += 1;
-  return state.players[idx].player_id;
+  return eligible[idx].player_id;
+}
+
+export function isPlayerEliminated(state: MultiplayerState, playerId: string): boolean {
+  return (state.playerLives[playerId] ?? 0) <= 0;
+}
+
+export function getAircraftOwnerId(state: GameState, aircraftId: string): string | null {
+  const mp = state.multiplayerState;
+  if (!mp) return null;
+  const ac = state.aircraft.find((a) => a.id === aircraftId);
+  return ac?.assignedPlayerId ?? mp.room.host_id;
+}
+
+export function applyVersusPlayerDamage(
+  state: GameState,
+  ownerId: string,
+  amount: number
+): GameState {
+  const mp = state.multiplayerState;
+  if (!mp || mp.room.mode !== 'versus') return state;
+  const current = mp.playerLives[ownerId] ?? 0;
+  if (current <= 0) return state;
+  return {
+    ...state,
+    multiplayerState: {
+      ...mp,
+      playerLives: {
+        ...mp.playerLives,
+        [ownerId]: Math.max(0, current - amount),
+      },
+    },
+  };
+}
+
+export function getVersusWinnerByElimination(state: GameState): string | null {
+  const mp = state.multiplayerState;
+  if (!mp) return null;
+  const alive = mp.players.filter((p) => (mp.playerLives[p.player_id] ?? 0) > 0);
+  if (alive.length === 1) return alive[0].player_id;
+  return null;
 }
 
 export function canControlAircraft(
@@ -97,7 +143,7 @@ export function canControlAircraft(
   gameState: GameState
 ): boolean {
   if (state.room.mode === 'coop_shared') return true;
-  if (playerId === state.room.host_id) return true;
+  if (isPlayerEliminated(state, playerId)) return false;
   const ac = gameState.aircraft.find((a) => a.id === aircraftId);
   if (!ac) return false;
   return ac.assignedPlayerId === playerId;
@@ -211,7 +257,17 @@ export function checkMultiplayerMatchEnd(state: GameState, now: number): MatchEn
   const mode = mp.room.mode;
 
   if (mode === 'versus') {
+    const eliminationWinner = getVersusWinnerByElimination(state);
+    if (eliminationWinner && mp.players.length > 1) {
+      return {
+        reason: 'versus_landings',
+        winnerId: eliminationWinner,
+        playerScores: mp.playerScores,
+      };
+    }
+
     for (const p of mp.players) {
+      if (isPlayerEliminated(mp, p.player_id)) continue;
       if ((mp.playerLandings[p.player_id] ?? 0) >= VERSUS_LANDING_GOAL) {
         return {
           reason: 'versus_landings',
@@ -224,10 +280,20 @@ export function checkMultiplayerMatchEnd(state: GameState, now: number): MatchEn
       let winnerId = mp.players[0]?.player_id ?? null;
       let best = -1;
       for (const p of mp.players) {
+        if (isPlayerEliminated(mp, p.player_id)) continue;
         const s = mp.playerScores[p.player_id] ?? 0;
         if (s > best) {
           best = s;
           winnerId = p.player_id;
+        }
+      }
+      if (best < 0) {
+        for (const p of mp.players) {
+          const s = mp.playerScores[p.player_id] ?? 0;
+          if (s > best) {
+            best = s;
+            winnerId = p.player_id;
+          }
         }
       }
       return { reason: 'versus_time', winnerId, playerScores: mp.playerScores };

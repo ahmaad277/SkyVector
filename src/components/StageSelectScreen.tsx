@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { LEVELS } from '../levels';
+import { getLandingTargetForLevel } from '../utils/levelProgress';
 import ScreenHeader from './shared/ScreenHeader';
 import GridBackground from './shared/GridBackground';
 
@@ -7,6 +8,7 @@ interface StageSelectScreenProps {
   onStartLevel: (level: number) => void;
   onBack: () => void;
   unlockedLevel: number;
+  highScores?: Record<number, number>;
 }
 
 const LockIcon = () => (
@@ -32,6 +34,7 @@ export default function StageSelectScreen({
   onStartLevel,
   onBack,
   unlockedLevel,
+  highScores = {},
 }: StageSelectScreenProps) {
   const [hoveredId, setHoveredId] = useState<number | null>(null);
 
@@ -93,6 +96,15 @@ export default function StageSelectScreen({
                 <div style={styles.lvlSub}>
                   {lvl.subtitle}
                 </div>
+
+                {!locked && (
+                  <div style={styles.metaRow}>
+                    <span>Target: {getLandingTargetForLevel(lvl.id)} landings</span>
+                    {(highScores[lvl.id] ?? 0) > 0 && (
+                      <span>Best: {(highScores[lvl.id] ?? 0).toLocaleString()}</span>
+                    )}
+                  </div>
+                )}
 
                 {!locked && (
                   <div style={{
@@ -193,6 +205,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 11,
     color: 'rgba(255,255,255,0.38)',
     lineHeight: 1.35,
+  },
+  metaRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+    marginTop: 8,
+    fontFamily: 'var(--font-mono)',
+    fontSize: 9,
+    color: 'rgba(0,240,255,0.65)',
   },
   accentBar: {
     position: 'absolute',
