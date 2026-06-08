@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useMultiplayer } from '../hooks/useMultiplayer';
 
 interface LobbyScreenProps {
@@ -10,6 +10,7 @@ interface LobbyScreenProps {
 
 export default function LobbyScreen({ multiplayer, onBack, onStartGame, currentUserId }: LobbyScreenProps) {
   const { room, players, updateReadyStatus, startGame, leaveRoom } = multiplayer;
+  const [copied, setCopied] = useState(false);
 
   if (!room) return null;
 
@@ -35,12 +36,36 @@ export default function LobbyScreen({ multiplayer, onBack, onStartGame, currentU
     }
   };
 
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(room.code);
+    } catch {
+      // Fallback for insecure contexts
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div style={styles.root}>
       <div style={styles.card}>
         <div style={styles.header}>
           <h1 style={styles.title}>ROOM: <span style={{ color: '#FFF' }}>{room.code}</span></h1>
-          <div style={styles.modeBadge}>{room.mode.replace('_', ' ').toUpperCase()}</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              onClick={handleCopyCode}
+              style={{
+                ...styles.copyBtn,
+                background: copied ? 'rgba(57,255,20,0.15)' : 'rgba(0,240,255,0.1)',
+                borderColor: copied ? 'rgba(57,255,20,0.4)' : 'rgba(0,240,255,0.3)',
+                color: copied ? '#39FF14' : '#00F0FF',
+              }}
+              aria-label="Copy room code"
+            >
+              {copied ? '✓ COPIED' : '📋 COPY'}
+            </button>
+            <div style={styles.modeBadge}>{room.mode.replace('_', ' ').toUpperCase()}</div>
+          </div>
         </div>
 
         <div style={styles.playersList}>
@@ -151,6 +176,17 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-mono)',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  copyBtn: {
+    padding: '4px 10px',
+    borderRadius: 4,
+    border: '1px solid',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 10,
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    letterSpacing: 1,
+    transition: 'all 0.2s',
   },
   playersList: {
     display: 'flex',

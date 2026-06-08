@@ -1,5 +1,6 @@
 import React from 'react';
 import { COLORS } from '../utils/colorPalette';
+import StatRow from './shared/StatRow';
 
 interface GameOverScreenProps {
   score: number;
@@ -90,31 +91,6 @@ export default function GameOverScreen({
   );
 }
 
-function StatRow({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-}) {
-  return (
-    <div style={styles.statRow}>
-      <span style={styles.statLabel}>{label}</span>
-      <span
-        style={{
-          ...styles.statValue,
-          color: highlight ? COLORS.HUD_GOLD : COLORS.HUD_TEXT,
-          fontSize: highlight ? 28 : 20,
-        }}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
 const styles: Record<string, React.CSSProperties> = {
   overlay: {
     position: 'absolute',
@@ -180,20 +156,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '10px 0',
     borderTop: '1px solid rgba(0,255,65,0.1)',
     borderBottom: '1px solid rgba(0,255,65,0.1)',
-  },
-  statRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: COLORS.HUD_DIM,
-    letterSpacing: 2,
-  },
-  statValue: {
-    fontWeight: 'bold',
-    color: COLORS.HUD_TEXT,
   },
   btnRow: {
     display: 'flex',

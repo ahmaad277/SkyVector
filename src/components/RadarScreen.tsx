@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import type { GameState, Aircraft, Runway, Vec2 } from '../types/game.types';
 import { COLORS, getAircraftColor, getFuelColor, getRingColor } from '../utils/colorPalette';
 import { drawRunway, isOnRunway } from '../entities/Runway';
@@ -39,11 +39,14 @@ export default function RadarScreen({
     aircraftId: null,
   });
   const lastTapRef = useRef<{ time: number; id: string | null }>({ time: 0, id: null });
+  const [canvasReady, setCanvasReady] = useState(false);
 
   // ── Notify parent when canvas is ready ───────────────────
   useEffect(() => {
     if (canvasRef.current && onCanvasReady) {
       onCanvasReady(canvasRef.current);
+      const t = setTimeout(() => setCanvasReady(true), 600);
+      return () => clearTimeout(t);
     }
   }, [onCanvasReady]);
 
@@ -273,10 +276,42 @@ export default function RadarScreen({
   }, [onMouseDown, onMouseMove, onMouseUp, onTouchStart, onTouchMove, onTouchEnd]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{ display: 'block', cursor: 'crosshair', touchAction: 'none' }}
-    />
+    <>
+      {!canvasReady && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#0B1325',
+          zIndex: 20,
+          gap: 16,
+        }}>
+          <div style={{
+            width: 120,
+            height: 2,
+            background: 'linear-gradient(90deg, transparent, #00F0FF, transparent)',
+            backgroundSize: '200% 100%',
+            animation: 'radarSweep 2s linear infinite',
+            borderRadius: 1,
+          }} />
+          <div style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            color: 'rgba(0,240,255,0.6)',
+            letterSpacing: 3,
+          }}>
+            RADAR INITIALIZING
+          </div>
+        </div>
+      )}
+      <canvas
+        ref={canvasRef}
+        style={{ display: 'block', cursor: 'crosshair', touchAction: 'none' }}
+      />
+    </>
   );
 }
 

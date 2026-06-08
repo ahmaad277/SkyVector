@@ -162,6 +162,20 @@ export interface RankConfig {
   badge: string;
 }
 
+// Unified rank thresholds — single source of truth for the entire app
+export const RANK_THRESHOLDS: RankConfig[] = [
+  { rank: '2LT',      minXP: 0,       color: '#888',    badge: '⭐' },
+  { rank: '1LT',      minXP: 500,     color: '#A0A0A0', badge: '⭐⭐' },
+  { rank: 'CAPT',     minXP: 1500,    color: '#B0B0B0', badge: '⭐⭐⭐' },
+  { rank: 'MAJ',      minXP: 3000,    color: '#C0C0C0', badge: '👑' },
+  { rank: 'LT. COL',  minXP: 6000,    color: '#D0D0D0', badge: '👑⭐' },
+  { rank: 'COL',      minXP: 10000,   color: '#E0E0E0', badge: '👑⭐⭐' },
+  { rank: 'BRIG GEN', minXP: 15000,   color: '#F0E68C', badge: '👑⭐⭐⭐' },
+  { rank: 'MAJ. GEN', minXP: 22000,   color: '#FFD700', badge: '⚔️⭐' },
+  { rank: 'LT. GEN',  minXP: 32000,   color: '#FFA500', badge: '⚔️👑' },
+  { rank: 'GEN',      minXP: 50000,   color: '#FF8C00', badge: '⚔️👑⭐' },
+];
+
 export interface DailyMission {
   id: string;
   description: string;

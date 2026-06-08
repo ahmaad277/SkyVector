@@ -129,9 +129,9 @@ export default function MainMenu({
 
       {/* Developer Info */}
       <div style={styles.developerInfo}>
-        <div>Developer: أحمد غرم الله أحمد الزهراني</div>
-        <div>Phone: 0534897272</div>
-        <div>Email: Ahmaaad277@gmail.com</div>
+        <div style={styles.developerName}>أحمد غرم الله أحمد الزهراني</div>
+        <div>0534897272</div>
+        <div>Ahmaaad277@gmail.com</div>
       </div>
     </div>
   );
@@ -448,18 +448,23 @@ const styles: Record<string, React.CSSProperties> = {
   },
   developerInfo: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 'calc(env(safe-area-inset-bottom) + 6px)',
     left: 0,
     right: 0,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 4,
+    gap: 1,
+    lineHeight: 1.2,
     fontFamily: 'var(--font-mono)',
     fontSize: 'clamp(9px, 2.5vw, 11px)',
     color: 'rgba(255, 255, 255, 0.4)',
     pointerEvents: 'none',
     zIndex: 1,
     textAlign: 'center',
+  },
+  developerName: {
+    wordSpacing: '-2px',
+    letterSpacing: '-0.3px',
   },
 };

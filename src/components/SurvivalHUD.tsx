@@ -5,6 +5,7 @@ import { POWER_UPS } from '../engine/SurvivalEngine';
 import { COLORS } from '../utils/colorPalette';
 import DailyMissionsPanel from './hud/DailyMissionsPanel';
 import GameTopBar from './hud/GameTopBar';
+import EventTimer, { eventLabel } from './shared/EventTimer';
 
 interface SurvivalHUDProps {
   survivalState: SurvivalState;
@@ -29,14 +30,6 @@ export default function SurvivalHUD({ survivalState, missions, activeEvent, onPa
       return () => clearTimeout(t);
     }
   }, [activeEvent]);
-
-  const eventLabel: Record<string, (e: GameEvent) => string> = {
-    runway_closed: () => '⛔ RUNWAY CLOSED',
-    wind_shear:    () => '🌀 WIND SHEAR',
-    nordo_flight:  () => '★ NORDO AIRCRAFT INBOUND',
-    bird_strike:   () => '🐦 BIRD STRIKE ZONE',
-    round_start:   (e) => `ROUND ${e.payload?.round} STARTED! +${e.payload?.powerUpName}`,
-  };
 
   return (
     <div style={styles.root}>
@@ -96,24 +89,6 @@ export default function SurvivalHUD({ survivalState, missions, activeEvent, onPa
       {/* Daily Missions Panel */}
       <DailyMissionsPanel missions={missions} />
     </div>
-  );
-}
-
-// ── Event countdown ───────────────────────────────────────────
-function EventTimer({ event }: { event: GameEvent }) {
-  const [remaining, setRemaining] = useState(event.duration / 1000);
-  useEffect(() => {
-    const id = setInterval(() => {
-      const elapsed = Date.now() - event.startTime;
-      setRemaining(Math.max(0, (event.duration - elapsed) / 1000));
-    }, 200);
-    return () => clearInterval(id);
-  }, [event]);
-
-  return (
-    <span style={{ color: COLORS.HUD_WARNING, marginLeft: 10, fontSize: 11 }}>
-      {remaining.toFixed(0)}s
-    </span>
   );
 }
 

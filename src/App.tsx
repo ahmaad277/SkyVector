@@ -26,6 +26,10 @@ import { getBackgroundTheme } from './utils/backgroundThemes';
 
 import { createMultiplayerState, type PlayerInput } from './engine/MultiplayerEngine';
 
+import ScreenTransition from './components/shared/ScreenTransition';
+import ToastContainer, { showToast } from './components/shared/Toast';
+import { pickNextMission } from './utils/missionUtils';
+
 type AppScreen = 'menu' | 'stage_select' | 'game' | 'gameover' | 'leaderboard' | 'levelcomplete' | 'survival_menu' | 'online_menu' | 'lobby';
 
 export default function App() {
@@ -169,13 +173,7 @@ export default function App() {
       
       if (state.survivalState) {
         // In survival, this is just a round transition. Pick a new mission and continue.
-        const uncompletedMissions = missions.filter(m => !m.completed);
-        if (uncompletedMissions.length > 0) {
-          const randomMission = uncompletedMissions[Math.floor(Math.random() * uncompletedMissions.length)];
-          setActiveMissionId(randomMission.id);
-        } else {
-          setActiveMissionId(null);
-        }
+        setActiveMissionId(pickNextMission(missions));
         return;
       }
 
@@ -209,13 +207,7 @@ export default function App() {
       gameStateRef.current.score = carriedScore;
       
       // Pick a random uncompleted mission for this new level
-      const uncompletedMissions = missions.filter(m => !m.completed);
-      if (uncompletedMissions.length > 0) {
-        const randomMission = uncompletedMissions[Math.floor(Math.random() * uncompletedMissions.length)];
-        setActiveMissionId(randomMission.id);
-      } else {
-        setActiveMissionId(null);
-      }
+      setActiveMissionId(pickNextMission(missions));
 
       setScore(carriedScore);
       setCurrentLevel(nextLevel);
@@ -253,9 +245,6 @@ export default function App() {
 
       // Combo sound
       if (combo.count >= 2) play('combo');
-
-      // HUD flash
-      (HUD as any)._triggerFlash?.();
     },
     [play, progressMission, combo.count]
   );
@@ -284,6 +273,20 @@ export default function App() {
         if (screen === 'game') {
           if (isPaused) handleResume();
           else handlePause();
+        } else if (screen === 'stage_select') {
+          setScreen('menu');
+        } else if (screen === 'survival_menu') {
+          setScreen('menu');
+        } else if (screen === 'online_menu') {
+          setScreen('menu');
+        } else if (screen === 'lobby') {
+          setScreen('menu');
+        } else if (screen === 'leaderboard') {
+          setScreen('menu');
+        } else if (screen === 'levelcomplete') {
+          setScreen('menu');
+        } else if (screen === 'gameover') {
+          setScreen('menu');
         }
       }
     };
@@ -353,13 +356,7 @@ export default function App() {
     gameStateRef.current.altitudeEnabled = true;
     
     // Pick a random uncompleted mission for survival
-    const uncompletedMissions = missions.filter(m => !m.completed);
-    if (uncompletedMissions.length > 0) {
-      const randomMission = uncompletedMissions[Math.floor(Math.random() * uncompletedMissions.length)];
-      setActiveMissionId(randomMission.id);
-    } else {
-      setActiveMissionId(null);
-    }
+    setActiveMissionId(pickNextMission(missions));
 
     maxComboRef.current = 1;
     setScore(0);
@@ -388,13 +385,7 @@ export default function App() {
       }
       
       // Pick a random uncompleted mission for this level
-      const uncompletedMissions = missions.filter(m => !m.completed);
-      if (uncompletedMissions.length > 0) {
-        const randomMission = uncompletedMissions[Math.floor(Math.random() * uncompletedMissions.length)];
-        setActiveMissionId(randomMission.id);
-      } else {
-        setActiveMissionId(null);
-      }
+      setActiveMissionId(pickNextMission(missions));
 
       maxComboRef.current = 1;
       setScore(0);
@@ -603,6 +594,7 @@ export default function App() {
   // ── Render ────────────────────────────────────────────────
   return (
     <div style={appStyles.root} className={`theme-${bgTheme}`}>
+      <ToastContainer />
       {/* Game canvas — always mounted so ref stays valid */}
       <div
         ref={canvasContainerRef}

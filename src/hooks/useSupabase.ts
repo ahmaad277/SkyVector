@@ -8,25 +8,12 @@ import {
   updateMissionProgress,
 } from '../supabase/queries';
 import type { DailyMission, PlayerProfile, PlayerRank } from '../types/game.types';
-
-const RANK_THRESHOLDS: Record<PlayerRank, number> = {
-  '2LT':       0,
-  '1LT':       500,
-  'CAPT':      1500,
-  'MAJ':       3000,
-  'LT. COL':   6000,
-  'COL':       10000,
-  'BRIG GEN':  15000,
-  'MAJ. GEN':  22000,
-  'LT. GEN':   32000,
-  'GEN':       50000,
-};
+import { RANK_THRESHOLDS } from '../types/game.types';
 
 function xpToRank(xp: number): PlayerRank {
-  const ranks = Object.entries(RANK_THRESHOLDS) as [PlayerRank, number][];
   let current: PlayerRank = '2LT';
-  for (const [rank, min] of ranks) {
-    if (xp >= min) current = rank;
+  for (const { rank, minXP } of RANK_THRESHOLDS) {
+    if (xp >= minXP) current = rank;
   }
   return current;
 }

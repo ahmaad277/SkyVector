@@ -54,9 +54,28 @@ export default function Leaderboard({ onClose, currentPlayerScore }: Leaderboard
 
         {/* Table */}
         {loading ? (
-          <div style={styles.loading}>LOADING RADAR DATA...</div>
+          <div style={styles.loading}>
+            <div style={{
+              width: 24,
+              height: 24,
+              border: '2px solid rgba(0,255,65,0.2)',
+              borderTopColor: COLORS.HUD_GOLD,
+              borderRadius: '50%',
+              animation: 'radarSweep 1s linear infinite',
+              margin: '0 auto 12px',
+            }} />
+            LOADING RADAR DATA
+          </div>
         ) : entries.length === 0 ? (
-          <div style={styles.loading}>NO ENTRIES YET — BE THE FIRST!</div>
+          <div style={styles.emptyState}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🛩️</div>
+            <div style={{ color: COLORS.HUD_GOLD, fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>
+              NO ENTRIES YET
+            </div>
+            <div style={{ color: COLORS.HUD_DIM, fontSize: 10, letterSpacing: 1 }}>
+              BE THE FIRST TO SECURE A RANKING
+            </div>
+          </div>
         ) : (
           <div style={styles.tableWrap}>
             <div style={styles.tableHeader}>
@@ -194,6 +213,14 @@ const styles: Record<string, React.CSSProperties> = {
     color: COLORS.HUD_DIM,
     fontSize: 11,
     letterSpacing: 2,
+  },
+  emptyState: {
+    padding: 32,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    textAlign: 'center',
+    fontFamily: 'var(--font-mono)',
   },
   yourScore: {
     padding: '10px 18px',

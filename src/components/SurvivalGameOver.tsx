@@ -1,5 +1,6 @@
 import React from 'react';
 import type { SurvivalState } from '../types/survival.types';
+import StatRow from './shared/StatRow';
 
 interface SurvivalGameOverProps {
   state: SurvivalState;
@@ -41,21 +42,6 @@ export default function SurvivalGameOver({ state, onRetry, onMenu, onSubmitScore
           </button>
         )}
       </div>
-    </div>
-  );
-}
-
-function StatRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
-  return (
-    <div style={styles.statRow}>
-      <span style={styles.statLabel}>{label}</span>
-      <span style={{
-        ...styles.statValue,
-        color: highlight ? '#FFD700' : '#FFF',
-        fontSize: highlight ? 24 : 18,
-      }}>
-        {value}
-      </span>
     </div>
   );
 }
@@ -110,21 +96,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '16px 0',
     borderTop: '1px solid rgba(255,255,255,0.1)',
     borderBottom: '1px solid rgba(255,255,255,0.1)',
-  },
-  statRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
-  statLabel: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.5)',
-    letterSpacing: 1,
-  },
-  statValue: {
-    fontFamily: 'var(--font-mono)',
-    fontWeight: 'bold',
   },
   btnRow: {
     display: 'flex',

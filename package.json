@@ -10,7 +10,8 @@
     "cap:sync": "npx cap sync",
     "cap:open:ios": "npx cap open ios",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "predeploy": "tsc -b && vite build"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.4",

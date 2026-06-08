@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { LEVELS } from '../levels';
+import ScreenHeader from './shared/ScreenHeader';
+import GridBackground from './shared/GridBackground';
 
 interface StageSelectScreenProps {
   onStartLevel: (level: number) => void;
@@ -16,14 +18,14 @@ const LockIcon = () => (
 );
 
 const levelAccentColors = [
-  '#39FF14', // 1 — green
-  '#00F0FF', // 2 — cyan
-  '#39FF14', // 3
-  '#FFA500', // 4 — orange (IFR)
-  '#FF003C', // 5 — red (Storm)
-  '#FFA500', // 6
-  '#FF003C', // 7 — Emergency
-  '#FFD700', // 8 — gold (Midnight)
+  '#39FF14',
+  '#00F0FF',
+  '#39FF14',
+  '#FFA500',
+  '#FF003C',
+  '#FFA500',
+  '#FF003C',
+  '#FFD700',
 ];
 
 export default function StageSelectScreen({
@@ -35,32 +37,15 @@ export default function StageSelectScreen({
 
   return (
     <div style={styles.root}>
-      {/* Subtle grid background */}
-      <div style={styles.gridBg} aria-hidden="true" />
+      <GridBackground accentColor="#00F0FF" opacity={0.025} />
 
-      {/* Fixed header */}
-      <div style={styles.header}>
-        <button
-          style={styles.backBtn}
-          onClick={onBack}
-          onMouseEnter={(e) => (e.currentTarget.style.color = '#00F0FF')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(0,240,255,0.55)')}
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path d="M11 14L6 9l5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          BACK
-        </button>
+      <ScreenHeader
+        title="STAGE SELECT"
+        subtitle={`${unlockedLevel} / ${LEVELS.length} UNLOCKED`}
+        accentColor="#00F0FF"
+        onBack={onBack}
+      />
 
-        <div style={styles.headerTitle}>
-          <span style={styles.headerTitleText}>STAGE SELECT</span>
-          <span style={styles.headerTitleSub}>{unlockedLevel} / {LEVELS.length} UNLOCKED</span>
-        </div>
-
-        <div style={{ width: 72 }} />
-      </div>
-
-      {/* Scrollable level grid */}
       <div style={styles.scrollArea}>
         <div style={styles.grid}>
           {LEVELS.map((lvl) => {
@@ -71,6 +56,8 @@ export default function StageSelectScreen({
             return (
               <button
                 key={lvl.id}
+                aria-label={`Level ${lvl.id}: ${lvl.name}${locked ? ' (Locked)' : ''}`}
+                aria-disabled={locked}
                 style={{
                   ...styles.card,
                   ...(locked ? styles.cardLocked : {}),
@@ -88,7 +75,6 @@ export default function StageSelectScreen({
                 onTouchStart={() => setHoveredId(lvl.id)}
                 onTouchEnd={() => setHoveredId(null)}
               >
-                {/* Level number badge */}
                 <div style={{
                   ...styles.lvlBadge,
                   color: locked ? 'rgba(255,255,255,0.25)' : accent,
@@ -97,7 +83,6 @@ export default function StageSelectScreen({
                   LVL {lvl.id}
                 </div>
 
-                {/* Level name */}
                 <div style={{
                   ...styles.lvlName,
                   color: locked ? 'rgba(255,255,255,0.2)' : '#FFFFFF',
@@ -105,12 +90,10 @@ export default function StageSelectScreen({
                   {lvl.name}
                 </div>
 
-                {/* Subtitle */}
                 <div style={styles.lvlSub}>
                   {lvl.subtitle}
                 </div>
 
-                {/* Accent bar at bottom */}
                 {!locked && (
                   <div style={{
                     ...styles.accentBar,
@@ -119,7 +102,6 @@ export default function StageSelectScreen({
                   }} />
                 )}
 
-                {/* Lock overlay */}
                 {locked && (
                   <div style={styles.lockOverlay}>
                     <LockIcon />
@@ -146,71 +128,6 @@ const styles: Record<string, React.CSSProperties> = {
     paddingBottom: 'env(safe-area-inset-bottom)',
     animation: 'fadeIn 0.3s ease both',
   },
-
-  gridBg: {
-    position: 'absolute',
-    inset: 0,
-    backgroundImage: `
-      linear-gradient(rgba(0,240,255,0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,240,255,0.025) 1px, transparent 1px)
-    `,
-    backgroundSize: '48px 48px',
-    pointerEvents: 'none',
-  },
-
-  // ── Header ──
-  header: {
-    position: 'relative',
-    zIndex: 2,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '16px 20px 12px',
-    borderBottom: '1px solid rgba(0,240,255,0.08)',
-    background: 'rgba(11, 19, 37, 0.85)',
-    backdropFilter: 'blur(8px)',
-    WebkitBackdropFilter: 'blur(8px)',
-    flexShrink: 0,
-  },
-  backBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    fontFamily: 'var(--font-title)',
-    fontSize: 11,
-    fontWeight: 700,
-    letterSpacing: 2,
-    color: 'rgba(0,240,255,0.55)',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    padding: '6px 10px',
-    borderRadius: 6,
-    transition: 'color 0.15s ease',
-    width: 72,
-  },
-  headerTitle: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 2,
-  },
-  headerTitleText: {
-    fontFamily: 'var(--font-title)',
-    fontSize: 14,
-    fontWeight: 700,
-    letterSpacing: 4,
-    color: '#00F0FF',
-    textShadow: '0 0 12px rgba(0,240,255,0.5)',
-  },
-  headerTitleSub: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 10,
-    color: 'rgba(0,240,255,0.4)',
-    letterSpacing: 1,
-  },
-
-  // ── Scroll area ──
   scrollArea: {
     flex: 1,
     overflowY: 'auto',
@@ -226,8 +143,6 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: 500,
     margin: '0 auto',
   },
-
-  // ── Level card ──
   card: {
     position: 'relative',
     display: 'flex',
@@ -259,7 +174,6 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(57,255,20,0.4)',
     boxShadow: '0 0 24px rgba(57,255,20,0.12), 0 6px 24px rgba(0,0,0,0.5)',
   },
-
   lvlBadge: {
     fontFamily: 'var(--font-mono)',
     fontSize: 10,

@@ -1,41 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import type { GameState, GameEvent, PlayerRank, DailyMission } from '../types/game.types';
+import type { GameState, GameEvent, DailyMission } from '../types/game.types';
 import { COLORS } from '../utils/colorPalette';
 import { LEVELS } from '../levels';
 import { getLandingTargetForLevel } from '../utils/levelProgress';
 
 import DailyMissionsPanel from './hud/DailyMissionsPanel';
-
 import GameTopBar from './hud/GameTopBar';
+import EventTimer, { eventLabel } from './shared/EventTimer';
 
-// ── Rank definitions ─────────────────────────────────────────
-const RANKS: { rank: PlayerRank; minXP: number; color: string; badge: string }[] = [
-  { rank: '2LT',      minXP: 0,       color: '#888',    badge: '⭐' },
-  { rank: '1LT',      minXP: 500,     color: '#A0A0A0', badge: '⭐⭐' },
-  { rank: 'CAPT',     minXP: 1500,    color: '#B0B0B0', badge: '⭐⭐⭐' },
-  { rank: 'MAJ',      minXP: 3000,    color: '#C0C0C0', badge: '👑' },
-  { rank: 'LT. COL',  minXP: 6000,    color: '#D0D0D0', badge: '👑⭐' },
-  { rank: 'COL',      minXP: 10000,   color: '#E0E0E0', badge: '👑⭐⭐' },
-  { rank: 'BRIG GEN', minXP: 15000,   color: '#F0E68C', badge: '👑⭐⭐⭐' },
-  { rank: 'MAJ. GEN', minXP: 22000,   color: '#FFD700', badge: '⚔️⭐' },
-  { rank: 'LT. GEN',  minXP: 32000,   color: '#FFA500', badge: '⚔️👑' },
-  { rank: 'GEN',      minXP: 50000,   color: '#FF8C00', badge: '⚔️👑⭐' },
-];
+import { RANK_THRESHOLDS } from '../types/game.types';
 
-function getRankInfo(xp: number) {
-  let current = RANKS[0];
-  let next = RANKS[1];
-  for (let i = 0; i < RANKS.length; i++) {
-    if (xp >= RANKS[i].minXP) {
-      current = RANKS[i];
-      next = RANKS[i + 1] ?? RANKS[RANKS.length - 1];
+function getRankInfo(xp: number): { current: typeof RANK_THRESHOLDS[number]; next: typeof RANK_THRESHOLDS[number]; progress: number } {
+  let current = RANK_THRESHOLDS[0];
+  let next = RANK_THRESHOLDS[1] ?? RANK_THRESHOLDS[0];
+  for (let i = 0; i < RANK_THRESHOLDS.length; i++) {
+    if (xp >= RANK_THRESHOLDS[i].minXP) {
+      current = RANK_THRESHOLDS[i];
+      next = RANK_THRESHOLDS[i + 1] ?? RANK_THRESHOLDS[RANK_THRESHOLDS.length - 1];
     }
   }
-  const progress =
-    next === current
-      ? 1
-      : Math.min(1, (xp - current.minXP) / (next.minXP - current.minXP));
-  return { current, next, progress };
+  const progressVal = next === current ? 1 : Math.min(1, (xp - current.minXP) / (next.minXP - current.minXP));
+  return { current, next, progress: progressVal };
 }
 
 interface HUDProps {
@@ -78,21 +63,6 @@ export default function HUD({
       return () => clearTimeout(t);
     }
   }, [activeEvent]);
-
-  const triggerLandingFlash = () => {
-    // Flash handled internally or removed
-  };
-
-  // Expose flash trigger
-  (HUD as any)._triggerFlash = triggerLandingFlash;
-
-  const eventLabel: Record<string, (e: GameEvent) => string> = {
-    runway_closed: () => '⛔ RUNWAY CLOSED',
-    wind_shear:    () => '🌀 WIND SHEAR',
-    nordo_flight:  () => '★ NORDO AIRCRAFT INBOUND',
-    bird_strike:   () => '🐦 BIRD STRIKE ZONE',
-    round_start:   (e) => `ROUND ${e.payload?.round} STARTED! +${e.payload?.powerUpName}`,
-  };
 
   return (
     <div style={styles.hud}>
@@ -148,24 +118,6 @@ export default function HUD({
       {/* Daily Missions Panel */}
       <DailyMissionsPanel missions={missions} />
     </div>
-  );
-}
-
-// ── Event countdown ───────────────────────────────────────────
-function EventTimer({ event }: { event: GameEvent }) {
-  const [remaining, setRemaining] = useState(event.duration / 1000);
-  useEffect(() => {
-    const id = setInterval(() => {
-      const elapsed = Date.now() - event.startTime;
-      setRemaining(Math.max(0, (event.duration - elapsed) / 1000));
-    }, 200);
-    return () => clearInterval(id);
-  }, [event]);
-
-  return (
-    <span style={{ color: COLORS.HUD_WARNING, marginLeft: 10, fontSize: 11 }}>
-      {remaining.toFixed(0)}s
-    </span>
   );
 }
 
