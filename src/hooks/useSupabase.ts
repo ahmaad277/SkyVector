@@ -48,7 +48,6 @@ export function useSupabase() {
   const [profile, setProfile] = useState<PlayerProfile>(loadLocalProfile);
   const [missions, setMissions] = useState<DailyMission[]>([]);
   const [syncing, setSyncing] = useState(false);
-  const [online, setOnline] = useState(false);
 
   // ── Auth init ───────────────────────────────────────────────
   useEffect(() => {
@@ -58,7 +57,6 @@ export function useSupabase() {
         const existingId = await getExistingAuthUserId();
         if (existingId) {
           currentId = existingId;
-          setOnline(true);
           setProfile(prev => {
             const updated = { ...prev, id: existingId };
             saveLocalProfile(updated);

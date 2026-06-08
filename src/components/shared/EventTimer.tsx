@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { GameEvent } from '../../types/game.types';
 import { COLORS } from '../../utils/colorPalette';
 

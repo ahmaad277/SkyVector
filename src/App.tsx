@@ -26,8 +26,7 @@ import { getBackgroundTheme } from './utils/backgroundThemes';
 
 import { createMultiplayerState, type PlayerInput } from './engine/MultiplayerEngine';
 
-import ScreenTransition from './components/shared/ScreenTransition';
-import ToastContainer, { showToast } from './components/shared/Toast';
+import ToastContainer from './components/shared/Toast';
 import { pickNextMission } from './utils/missionUtils';
 
 type AppScreen = 'menu' | 'stage_select' | 'game' | 'gameover' | 'leaderboard' | 'levelcomplete' | 'survival_menu' | 'online_menu' | 'lobby';
