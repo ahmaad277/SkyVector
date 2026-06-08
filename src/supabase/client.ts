@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { DEFAULT_SUPABASE_ANON_KEY, DEFAULT_SUPABASE_URL } from './defaults';
 
 function readEnv(name: string): string {
   const raw = import.meta.env[name] as string | undefined;
@@ -35,8 +36,8 @@ function isValidAnonKey(key: string): boolean {
   return key.startsWith('eyJ') && key.split('.').length === 3;
 }
 
-const SUPABASE_URL = normalizeSupabaseUrl(readEnv('VITE_SUPABASE_URL'));
-const SUPABASE_ANON_KEY = readEnv('VITE_SUPABASE_ANON_KEY');
+const SUPABASE_URL = normalizeSupabaseUrl(readEnv('VITE_SUPABASE_URL') || DEFAULT_SUPABASE_URL);
+const SUPABASE_ANON_KEY = readEnv('VITE_SUPABASE_ANON_KEY') || DEFAULT_SUPABASE_ANON_KEY;
 
 export type SupabaseConfigError = 'missing_env' | 'invalid_url' | 'invalid_key';
 
