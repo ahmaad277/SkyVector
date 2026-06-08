@@ -88,6 +88,25 @@ export function getSurvivalLevelConfig(round: number): LevelConfig {
   };
 }
 
+export function advanceSurvivalRoundAfterPowerUp(
+  state: SurvivalState,
+  powerUp: PowerUp,
+  now: number
+): SurvivalState {
+  let next = applyPowerUp(state, powerUp, now);
+  const nextRound = next.round + 1;
+  next = {
+    ...next,
+    round: nextRound,
+    roundStartTime: now,
+    roundTimerMs: getRoundTimeLimit(nextRound),
+    roundLandings: 0,
+    roundLandingTarget: getRoundLandingTarget(nextRound),
+    pendingPowerUpChoices: null,
+  };
+  return next;
+}
+
 export function generatePowerUpChoices(): PowerUp[] {
   const types = Object.keys(POWER_UPS) as PowerUpType[];
   const shuffled = [...types].sort(() => Math.random() - 0.5);

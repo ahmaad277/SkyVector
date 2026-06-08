@@ -9,6 +9,7 @@ import { LEVELS } from '../levels';
 
 import { getSurvivalLevelConfig } from '../engine/SurvivalEngine';
 import { getBackgroundTheme, drawBackground } from '../utils/backgroundThemes';
+import { getPlayerColor } from '../engine/MultiplayerEngine';
 
 // ── Logical canvas size (all positions in GDD use this) ──────
 const LOGICAL_W = 800;
@@ -713,6 +714,18 @@ function drawAircraft(
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.restore();
+  }
+
+  // ── Player ownership ring (multiplayer squad / versus) ───
+  if (ac.assignedPlayerId && state.multiplayerState && state.multiplayerState.room.mode !== 'coop_shared') {
+    const ownerColor = getPlayerColor(state.multiplayerState, ac.assignedPlayerId);
+    ctx.beginPath();
+    ctx.arc(0, 0, stats.size + 8, 0, Math.PI * 2);
+    ctx.strokeStyle = ownerColor;
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   // ── Aircraft shape ─────────────────────────────────────────

@@ -240,23 +240,31 @@ export function clamp(val: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, val));
 }
 
-export function randomBetween(min: number, max: number): number {
-  return Math.random() * (max - min) + min;
+export function randomBetween(min: number, max: number, rng: () => number = Math.random): number {
+  return rng() * (max - min) + min;
 }
 
-export function randomIntBetween(min: number, max: number): number {
-  return Math.floor(randomBetween(min, max + 1));
+export function randomIntBetween(min: number, max: number, rng: () => number = Math.random): number {
+  return Math.floor(randomBetween(min, max + 1, rng));
 }
 
 /** Random spawn position on the edge of the canvas */
-export function randomEdgeSpawn(width: number, height: number, margin = 10): Vec2 {
-  const side = randomIntBetween(0, 3);
-  const topMargin = 85; // Extra margin at the top to avoid spawning under the HUD
+export function randomEdgeSpawn(width: number, height: number, marginOrRng: number | (() => number) = 10, maybeRng?: () => number): Vec2 {
+  let margin = 10;
+  let rng: () => number = Math.random;
+  if (typeof marginOrRng === 'function') {
+    rng = marginOrRng;
+  } else {
+    margin = marginOrRng;
+    if (maybeRng) rng = maybeRng;
+  }
+  const side = randomIntBetween(0, 3, rng);
+  const topMargin = 85;
   switch (side) {
-    case 0: return { x: randomBetween(margin, width - margin), y: topMargin };          // top
-    case 1: return { x: width - margin, y: randomBetween(topMargin, height - margin) }; // right
-    case 2: return { x: randomBetween(margin, width - margin), y: height - margin }; // bottom
-    default: return { x: margin, y: randomBetween(topMargin, height - margin) };        // left
+    case 0: return { x: randomBetween(margin, width - margin, rng), y: topMargin };
+    case 1: return { x: width - margin, y: randomBetween(topMargin, height - margin, rng) };
+    case 2: return { x: randomBetween(margin, width - margin, rng), y: height - margin };
+    default: return { x: margin, y: randomBetween(topMargin, height - margin, rng) };
   }
 }
 

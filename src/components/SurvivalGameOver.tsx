@@ -4,13 +4,14 @@ import StatRow from './shared/StatRow';
 
 interface SurvivalGameOverProps {
   state: SurvivalState;
+  maxCombo: number;
   onRetry: () => void;
   onMenu: () => void;
   onSubmitScore?: () => void;
   submitting?: boolean;
 }
 
-export default function SurvivalGameOver({ state, onRetry, onMenu, onSubmitScore, submitting }: SurvivalGameOverProps) {
+export default function SurvivalGameOver({ state, maxCombo, onRetry, onMenu, onSubmitScore, submitting }: SurvivalGameOverProps) {
   return (
     <div style={styles.overlay}>
       <div style={styles.card}>
@@ -20,6 +21,7 @@ export default function SurvivalGameOver({ state, onRetry, onMenu, onSubmitScore
 
         <div style={styles.statsGrid}>
           <StatRow label="ROUNDS SURVIVED" value={`${state.round - 1}`} highlight />
+          <StatRow label="BEST COMBO" value={`x${maxCombo}`} />
           <StatRow label="TOTAL SCORE" value={state.totalScore.toLocaleString()} />
           <StatRow label="AIRCRAFT LANDED" value={`${state.totalLandings}`} />
         </div>

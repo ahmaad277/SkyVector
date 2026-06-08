@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useMultiplayer } from '../hooks/useMultiplayer';
+import { requiresMinTwoPlayers } from '../engine/MultiplayerEngine';
 
 interface LobbyScreenProps {
   multiplayer: ReturnType<typeof useMultiplayer>;
@@ -17,6 +18,8 @@ export default function LobbyScreen({ multiplayer, onBack, onStartGame, currentU
   const isHost = room.host_id === currentUserId;
   const me = players.find(p => p.player_id === currentUserId);
   const allReady = players.every(p => p.is_ready);
+  const needsTwo = requiresMinTwoPlayers(room.mode);
+  const canStart = allReady && (!needsTwo || players.length >= 2);
 
   const handleLeave = () => {
     leaveRoom();
@@ -30,7 +33,7 @@ export default function LobbyScreen({ multiplayer, onBack, onStartGame, currentU
   };
 
   const handleStart = () => {
-    if (isHost && allReady) {
+    if (isHost && canStart) {
       startGame();
       onStartGame();
     }
@@ -95,6 +98,10 @@ export default function LobbyScreen({ multiplayer, onBack, onStartGame, currentU
           ))}
         </div>
 
+        {needsTwo && players.length < 2 && (
+          <div style={styles.hint}>Squad and Versus require at least 2 players.</div>
+        )}
+
         <div style={styles.actions}>
           <button style={styles.secondaryBtn} onClick={handleLeave}>
             LEAVE ROOM
@@ -104,11 +111,11 @@ export default function LobbyScreen({ multiplayer, onBack, onStartGame, currentU
             <button 
               style={{
                 ...styles.primaryBtn,
-                opacity: allReady ? 1 : 0.5,
-                cursor: allReady ? 'pointer' : 'not-allowed'
+                opacity: canStart ? 1 : 0.5,
+                cursor: canStart ? 'pointer' : 'not-allowed'
               }} 
               onClick={handleStart}
-              disabled={!allReady}
+              disabled={!canStart}
             >
               START GAME
             </button>
@@ -222,6 +229,16 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 4,
     fontSize: 11,
     fontWeight: 'bold',
+  },
+  hint: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    color: '#FFD700',
+    textAlign: 'center',
+    padding: '8px 12px',
+    background: 'rgba(255,215,0,0.08)',
+    borderRadius: 6,
+    border: '1px solid rgba(255,215,0,0.25)',
   },
   actions: {
     display: 'flex',

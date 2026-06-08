@@ -11,8 +11,8 @@ import {
 } from './EventBus';
 import { LEVELS } from '../levels';
 import { getLandingTargetForLevel } from '../utils/levelProgress';
-import { getSurvivalLevelConfig, processSurvivalLanding, expireBuffs, hasBuff, consumeIronShield, generatePowerUpChoices, applyPowerUp, getRoundTimeLimit, getRoundLandingTarget } from './SurvivalEngine';
-import { applyPlayerInput } from './MultiplayerEngine';
+import { getSurvivalLevelConfig, processSurvivalLanding, expireBuffs, hasBuff, consumeIronShield, generatePowerUpChoices } from './SurvivalEngine';
+import { applyPlayerInput, pickSpawnOwner, recordMultiplayerLanding, checkMultiplayerMatchEnd } from './MultiplayerEngine';
 
 interface UseGameLoopOptions {
   gameStateRef: React.MutableRefObject<GameState>;
@@ -23,6 +23,8 @@ interface UseGameLoopOptions {
   onLevelComplete: (level: number) => void;
   onEventTriggered: (event: GameState['activeEvent']) => void;
   onLanding: (callsign: string, isNORDO: boolean, isEmergency: boolean) => void;
+  onSurvivalRoundComplete?: () => void;
+  onMultiplayerMatchEnd?: (result: import('./MultiplayerEngine').MatchEndResult) => void;
   renderFrame: (state: GameState, canvas: HTMLCanvasElement) => void;
 }
 
@@ -36,6 +38,8 @@ export function useGameLoop(options: UseGameLoopOptions) {
     onLevelComplete,
     onEventTriggered,
     onLanding,
+    onSurvivalRoundComplete,
+    onMultiplayerMatchEnd,
     renderFrame,
   } = options;
 
@@ -62,6 +66,13 @@ export function useGameLoop(options: UseGameLoopOptions) {
 
       const state = gameStateRef.current;
       if (state.phase !== 'playing') {
+        renderFrame(state, canvas);
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      // Guests only render — host simulates and broadcasts
+      if (state.multiplayerState && !state.multiplayerState.isHost) {
         renderFrame(state, canvas);
         rafRef.current = requestAnimationFrame(tick);
         return;
@@ -110,35 +121,22 @@ export function useGameLoop(options: UseGameLoopOptions) {
           }
         }
         
-        // Check if round complete
-        if (survState.roundLandings >= survState.roundLandingTarget) {
-           const nextRound = survState.round + 1;
-           const choices = generatePowerUpChoices();
-           const awardedPowerUp = choices[Math.floor(Math.random() * choices.length)];
-           
-           survState = {
-             ...survState,
-             round: nextRound,
-             roundStartTime: now,
-             roundTimerMs: getRoundTimeLimit(nextRound),
-             roundLandings: 0,
-             roundLandingTarget: getRoundLandingTarget(nextRound),
-           };
-           survState = applyPowerUp(survState, awardedPowerUp, now);
-           
-           const newConfig = getSurvivalLevelConfig(nextRound);
-           newState.runways = newConfig.runways.map((r) => ({ ...r, isOpen: true, closedUntil: 0 }));
-           newState.windDirection = newConfig.windDirection;
-           newState.windStrength = newConfig.windStrength;
-           
-           newState.activeEvent = {
-             type: 'round_start',
-             startTime: now,
-             duration: 4000,
-             payload: { round: nextRound, powerUpName: awardedPowerUp.name }
-           };
-           onEventTriggered(newState.activeEvent);
-           onLevelComplete(nextRound);
+        // Check if round complete — pause for power-up choice
+        if (
+          survState.roundLandings >= survState.roundLandingTarget &&
+          !survState.pendingPowerUpChoices
+        ) {
+          survState = {
+            ...survState,
+            pendingPowerUpChoices: generatePowerUpChoices(),
+          };
+          newState.survivalState = survState;
+          newState.phase = 'paused';
+          isRunningRef.current = false;
+          gameStateRef.current = newState;
+          renderFrame(newState, canvas);
+          onSurvivalRoundComplete?.();
+          return;
         }
 
         newState.survivalState = survState;
@@ -150,16 +148,28 @@ export function useGameLoop(options: UseGameLoopOptions) {
         newState.aircraft.filter((a) => a.state !== 'landed' && a.state !== 'crashed').length <
           config.maxAircraft
       ) {
-        const newAc = spawnAircraft(config, canvas.width, canvas.height, newState.altitudeEnabled);
+        const rng = newState.multiplayerState?.rng ?? Math.random;
+        const ownerId = newState.multiplayerState
+          ? pickSpawnOwner(newState.multiplayerState)
+          : null;
+        const newAc = spawnAircraft(
+          config,
+          canvas.width,
+          canvas.height,
+          newState.altitudeEnabled,
+          false,
+          rng,
+          ownerId
+        );
         if (newAc) {
           if (newAc.isNORDO) {
             const validRunways = config.runways.filter((r) => {
               if (newAc.type === 'helicopter') return r.type === 'helipad';
-              if (newAc.type === 'cessna')     return r.type === 'short' || r.type === 'long';
+              if (newAc.type === 'cessna') return r.type === 'short' || r.type === 'long';
               return r.type === 'long';
             });
             if (validRunways.length > 0) {
-              const targetRunway = validRunways[Math.floor(Math.random() * validRunways.length)];
+              const targetRunway = validRunways[Math.floor(rng() * validRunways.length)];
               newAc.path = [newAc.position, targetRunway.position];
               newAc.targetRunwayId = targetRunway.id;
             }
@@ -332,6 +342,10 @@ export function useGameLoop(options: UseGameLoopOptions) {
           a.id === result.aircraftId ? { ...a, state: 'landed', landedTime: now } : a
         );
         newState.totalLandings += 1;
+
+        if (newState.multiplayerState) {
+          newState = recordMultiplayerLanding(newState, result.aircraftId, multiplied);
+        }
       }
 
       if (!didLand) {
@@ -357,7 +371,19 @@ export function useGameLoop(options: UseGameLoopOptions) {
         onEventTriggered(newState.activeEvent);
         
         if (event.type === 'nordo_flight') {
-          const newAc = spawnAircraft(config, canvas.width, canvas.height, newState.altitudeEnabled, true);
+          const eventRng = newState.multiplayerState?.rng ?? Math.random;
+          const ownerId = newState.multiplayerState
+            ? pickSpawnOwner(newState.multiplayerState)
+            : null;
+          const newAc = spawnAircraft(
+            config,
+            canvas.width,
+            canvas.height,
+            newState.altitudeEnabled,
+            true,
+            eventRng,
+            ownerId
+          );
           if (newAc) {
             const validRunways = config.runways.filter((r) => {
               if (newAc.type === 'helicopter') return r.type === 'helipad';
@@ -365,7 +391,7 @@ export function useGameLoop(options: UseGameLoopOptions) {
               return r.type === 'long';
             });
             if (validRunways.length > 0) {
-              const targetRunway = validRunways[Math.floor(Math.random() * validRunways.length)];
+              const targetRunway = validRunways[Math.floor(eventRng() * validRunways.length)];
               newAc.path = [newAc.position, targetRunway.position];
               newAc.targetRunwayId = targetRunway.id;
             }
@@ -397,8 +423,22 @@ export function useGameLoop(options: UseGameLoopOptions) {
       );
       newState.scorePopups = (newState.scorePopups ?? []).filter(p => now - p.createdAt < 1500);
 
-      // ── 8. Level complete check ───────────────────────────
-      if (!isSurvival && newState.totalLandings >= getLandingTargetForLevel(newState.level) && newState.level < LEVELS.length) {
+      // ── 8. Level complete / multiplayer match end ─────────
+      if (newState.multiplayerState) {
+        const matchEnd = checkMultiplayerMatchEnd(newState, now);
+        if (matchEnd) {
+          isRunningRef.current = false;
+          newState.multiplayerState = {
+            ...newState.multiplayerState,
+            matchEnded: true,
+            winnerId: matchEnd.winnerId,
+          };
+          gameStateRef.current = { ...newState, phase: 'gameover' };
+          renderFrame(gameStateRef.current, canvas);
+          onMultiplayerMatchEnd?.(matchEnd);
+          return;
+        }
+      } else if (!isSurvival && newState.totalLandings >= getLandingTargetForLevel(newState.level)) {
         isRunningRef.current = false;
         gameStateRef.current = { ...newState, phase: 'levelcomplete' };
         renderFrame(gameStateRef.current, canvas);
@@ -420,7 +460,7 @@ export function useGameLoop(options: UseGameLoopOptions) {
       renderFrame(newState, canvas);
       rafRef.current = requestAnimationFrame(tick);
     },
-    [gameStateRef, canvasRef, onScoreUpdate, onComboUpdate, onGameOver, onLevelComplete, onEventTriggered, onLanding, renderFrame]
+    [gameStateRef, canvasRef, onScoreUpdate, onComboUpdate, onGameOver, onLevelComplete, onEventTriggered, onLanding, onSurvivalRoundComplete, onMultiplayerMatchEnd, renderFrame]
   );
 
   const start = useCallback(() => {
@@ -475,7 +515,7 @@ export function createInitialGameState(level: number): GameState {
     runways: config.runways.map((r) => ({ ...r, isOpen: true, closedUntil: 0 })),
     combo: { count: 0, multiplier: 1, lastLandingTime: 0, timeoutMs: 5000 },
     activeEvent: null,
-    nextEventTime: Date.now() + 90_000,
+    nextEventTime: Date.now() + 30_000,
     radarAngle: 0,
     windDirection: config.windDirection,
     windStrength: config.windStrength,

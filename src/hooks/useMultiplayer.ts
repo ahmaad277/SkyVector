@@ -320,6 +320,19 @@ export function useMultiplayer() {
     }
   }, []);
 
+  const finishMatch = useCallback(async () => {
+    const currentRoom = roomRef.current;
+    if (!currentRoom || !isSupabaseReady) return;
+    try {
+      await supabase
+        .from('rooms')
+        .update({ status: 'finished' })
+        .eq('id', currentRoom.id);
+    } catch (err) {
+      console.error('Error finishing match:', err);
+    }
+  }, []);
+
   return {
     room,
     players,
@@ -332,6 +345,7 @@ export function useMultiplayer() {
     leaveRoom,
     updateReadyStatus,
     startGame,
+    finishMatch,
     channel,
     prepareAuth,
   };

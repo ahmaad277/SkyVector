@@ -5,6 +5,7 @@ import { LEVELS } from '../levels';
 
 interface LevelCompleteScreenProps {
   level: number;
+  score: number;
   stats: {
     perfectLandings: number;
     fastestLanding: number;
@@ -12,15 +13,25 @@ interface LevelCompleteScreenProps {
   };
   onNextLevel: () => void;
   onMenu: () => void;
+  onSubmitScore?: () => void;
+  submitting?: boolean;
 }
 
-export default function LevelCompleteScreen({ level, stats, onNextLevel, onMenu }: LevelCompleteScreenProps) {
+export default function LevelCompleteScreen({
+  level,
+  score,
+  stats,
+  onNextLevel,
+  onMenu,
+  onSubmitScore,
+  submitting,
+}: LevelCompleteScreenProps) {
   const isFinalLevel = level >= LEVELS.length;
 
   return (
     <div style={styles.overlay}>
       <div style={styles.container}>
-        <div style={styles.glitchText}>STAGE CLEARED</div>
+        <div style={styles.glitchText}>{isFinalLevel ? 'CAMPAIGN COMPLETE' : 'STAGE CLEARED'}</div>
         
         <h2 style={styles.levelText}>SECTOR {level} SECURED</h2>
         
@@ -32,6 +43,10 @@ export default function LevelCompleteScreen({ level, stats, onNextLevel, onMenu 
 
         <div style={styles.statsGrid}>
           <div style={styles.statBox}>
+            <div style={styles.statLabel}>FINAL SCORE</div>
+            <div style={styles.statValue}>{score.toLocaleString()}</div>
+          </div>
+          <div style={styles.statBox}>
             <div style={styles.statLabel}>PERFECT LANDINGS</div>
             <div style={styles.statValue}>{stats.perfectLandings}</div>
           </div>
@@ -39,16 +54,17 @@ export default function LevelCompleteScreen({ level, stats, onNextLevel, onMenu 
             <div style={styles.statLabel}>FASTEST LANDING</div>
             <div style={styles.statValue}>{stats.fastestLanding === Infinity ? '--' : `${(stats.fastestLanding / 1000).toFixed(1)}s`}</div>
           </div>
-          <div style={styles.statBox}>
-            <div style={styles.statLabel}>TIME BONUS PTS</div>
-            <div style={styles.statValue}>+{stats.totalTimeBonuses}</div>
-          </div>
         </div>
 
         <div style={styles.buttons}>
           {!isFinalLevel && (
             <button style={styles.btnPrimary} onClick={onNextLevel}>
               NEXT STAGE
+            </button>
+          )}
+          {isFinalLevel && onSubmitScore && (
+            <button style={styles.btnPrimary} onClick={onSubmitScore} disabled={submitting}>
+              {submitting ? 'SUBMITTING...' : 'SUBMIT TO LEADERBOARD'}
             </button>
           )}
           <button style={styles.btnSecondary} onClick={onMenu}>

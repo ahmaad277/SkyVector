@@ -51,6 +51,7 @@ export interface Aircraft {
   landedTime?: number;
   altitude: 1 | 2 | 3;
   targetAltitude: 1 | 2 | 3;
+  assignedPlayerId?: string | null;
 }
 
 export interface Runway {

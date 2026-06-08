@@ -7,6 +7,7 @@ interface MainMenuProps {
   onSurvival: () => void;
   onOnline: () => void;
   onLeaderboard: () => void;
+  onHowToPlay: () => void;
   onUnlockAllStages: () => void;
   onLockAllStages: () => void;
   onResetProgress: () => void;
@@ -21,6 +22,7 @@ export default function MainMenu({
   onSurvival,
   onOnline,
   onLeaderboard,
+  onHowToPlay,
   onUnlockAllStages,
   onLockAllStages,
   onResetProgress,
@@ -36,6 +38,7 @@ export default function MainMenu({
     { id: 'newgame',     label: 'NEW GAME',     action: onNewGame,     disabled: false },
     { id: 'survival',    label: 'SURVIVAL MODE', action: onSurvival,    disabled: false, isSpecial: true },
     { id: 'online',      label: 'ONLINE MULTIPLAYER', action: onOnline, disabled: false },
+    { id: 'howto',       label: 'HOW TO PLAY',        action: onHowToPlay, disabled: false },
     { id: 'leaderboard', label: 'LEADERBOARD',  action: onLeaderboard, disabled: false },
     { id: 'settings',    label: 'SETTINGS',     action: () => setSettingsOpen(true), disabled: false },
   ];

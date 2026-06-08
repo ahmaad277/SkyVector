@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useMultiplayer, type MultiplayerMode } from '../hooks/useMultiplayer';
+import { getModeDescription } from '../engine/MultiplayerEngine';
+import { LEVELS } from '../levels';
 
 interface OnlineMenuProps {
   onBack: () => void;
@@ -11,7 +13,7 @@ export default function OnlineMenu({ onBack, username, multiplayer }: OnlineMenu
   const { createRoom, joinRoom, loading, isLoadingAuth, error, prepareAuth } = multiplayer;
   const [joinCode, setJoinCode] = useState('');
   const [mode, setMode] = useState<MultiplayerMode>('coop_shared');
-  const level = 1;
+  const [level, setLevel] = useState(1);
 
   useEffect(() => {
     void prepareAuth();
@@ -53,6 +55,19 @@ export default function OnlineMenu({ onBack, username, multiplayer }: OnlineMenu
               <option value="coop_shared">SHARED CO-OP</option>
               <option value="coop_squad">SQUAD CO-OP</option>
               <option value="versus">VERSUS</option>
+            </select>
+          </div>
+          <p style={styles.modeDesc}>{getModeDescription(mode)}</p>
+          <div style={styles.row}>
+            <label style={styles.label}>LEVEL</label>
+            <select
+              value={level}
+              onChange={(e) => setLevel(Number(e.target.value))}
+              style={styles.select}
+            >
+              {LEVELS.map((_, i) => (
+                <option key={i + 1} value={i + 1}>LEVEL {i + 1}</option>
+              ))}
             </select>
           </div>
           <button 
@@ -159,6 +174,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-mono)',
     fontSize: 12,
     outline: 'none',
+  },
+  modeDesc: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.55)',
+    lineHeight: 1.45,
+    margin: 0,
   },
   input: {
     flex: 1,

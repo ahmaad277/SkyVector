@@ -6,10 +6,10 @@ import {
   inwardHeading,
 } from '../utils/pathMath';
 
-function weightedRandom(weights: Record<AircraftType, number>): AircraftType {
+function weightedRandom(weights: Record<AircraftType, number>, rng: () => number): AircraftType {
   const types = Object.keys(weights) as AircraftType[];
   const total = types.reduce((s, t) => s + weights[t], 0);
-  let r = Math.random() * total;
+  let r = rng() * total;
   for (const t of types) {
     r -= weights[t];
     if (r <= 0) return t;
@@ -22,31 +22,30 @@ export function spawnAircraft(
   canvasWidth: number,
   canvasHeight: number,
   altitudeEnabled: boolean,
-  forceNORDO = false
+  forceNORDO = false,
+  rng: () => number = Math.random,
+  assignedPlayerId: string | null = null
 ) {
-  const type = weightedRandom(config.typeWeights);
+  const type = weightedRandom(config.typeWeights, rng);
 
-  // Pick a runway that accepts this aircraft type
   const validRunways = config.runways.filter((r) => {
     if (type === 'helicopter') return r.type === 'helipad';
-    if (type === 'cessna')     return r.type === 'short' || r.type === 'long';
+    if (type === 'cessna') return r.type === 'short' || r.type === 'long';
     return r.type === 'long';
   });
 
   if (validRunways.length === 0) return null;
 
-  const spawnPos = randomEdgeSpawn(canvasWidth, canvasHeight);
-  const heading = inwardHeading(spawnPos, canvasWidth, canvasHeight) + randomBetween(-15, 15);
+  const spawnPos = randomEdgeSpawn(canvasWidth, canvasHeight, 10, rng);
+  const heading = inwardHeading(spawnPos, canvasWidth, canvasHeight) + randomBetween(-15, 15, rng);
 
-  // ~8% emergency, ~4% VIP (not both)
-  const roll = Math.random();
+  const roll = rng();
   const isEmergency = !forceNORDO && roll < 0.08;
   const isNORDO = forceNORDO || (!isEmergency && roll > 0.96);
-  
-  // Altitude: If enabled, uses FL1/FL2/FL3. Spawn at FL3 usually.
-  const altitude = altitudeEnabled ? (Math.random() > 0.5 ? 3 : 2) : 1;
 
-  return createAircraft(
+  const altitude = altitudeEnabled ? (rng() > 0.5 ? 3 : 2) : 1;
+
+  const ac = createAircraft(
     type,
     spawnPos,
     (heading + 360) % 360,
@@ -56,4 +55,6 @@ export function spawnAircraft(
     isNORDO,
     altitude as 1 | 2 | 3
   );
+
+  return { ...ac, assignedPlayerId };
 }
